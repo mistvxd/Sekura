@@ -1,5 +1,4 @@
 build/
-iso_root/
 disk.img
 *.iso
 *.o
