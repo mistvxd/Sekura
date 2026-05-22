@@ -1,0 +1,11 @@
+build/
+iso_root/
+disk.img
+*.iso
+*.o
+*.elf
+*.bin
+
+.vscode/
+
+compile_commands.json
