@@ -4,6 +4,7 @@ disk.img
 *.o
 *.elf
 *.bin
+*.log
 
 .vscode/
 

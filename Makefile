@@ -2,21 +2,21 @@ CC = clang
 AS = nasm
 LD = ld.lld
 
-CFLAGS = -ffreestanding -fno-stack-protector -mno-red-zone -m64 -Iinclude
+CFLAGS = -ffreestanding -fno-stack-protector -mno-red-zone -m64 -Isrc
 USER_CFLAGS = -ffreestanding -fno-stack-protector -mno-red-zone -m64 -nostdlib -Iinclude
 ASFLAGS = -f elf64
 
-KERNEL_SRC_C = $(shell find src -path "src/userspace" -prune -o -name "*.c" -print)
-KERNEL_SRC_ASM = $(shell find src -path "src/userspace" -prune -o -name "*.asm" -print)
+KERNEL_SRC_C = $(shell find src -path "src/sekura/userspace" -prune -o -name "*.c" -print)
+KERNEL_SRC_ASM = $(shell find src -path "src/sekura/userspace" -prune -o -name "*.asm" -print)
 
-USER_SRC_C = $(shell find src/userspace -name "*.c")
-USER_SRC_ASM = $(shell find src/userspace -name "*.asm")
+USER_SRC_C = $(shell find src/sekura/userspace -name "*.c")
+USER_SRC_ASM = $(shell find src/sekura/userspace -name "*.asm")
 
 KERNEL_OBJ_C = $(patsubst src/%.c, build/%.o, $(KERNEL_SRC_C))
 KERNEL_OBJ_ASM = $(patsubst src/%.asm, build/%.o, $(KERNEL_SRC_ASM))
 
-USER_OBJ_C = $(patsubst src/userspace/%.c, build/userspace/%.o, $(USER_SRC_C))
-USER_OBJ_ASM = $(patsubst src/userspace/%.asm, build/userspace/%.o, $(USER_SRC_ASM))
+USER_OBJ_C = $(patsubst src/sekura/userspace/%.c, build/userspace/%.o, $(USER_SRC_C))
+USER_OBJ_ASM = $(patsubst src/sekura/userspace/%.asm, build/userspace/%.o, $(USER_SRC_ASM))
 
 KERNEL_OBJS = $(KERNEL_OBJ_C) $(KERNEL_OBJ_ASM)
 USER_OBJS = $(USER_OBJ_C) $(USER_OBJ_ASM)
@@ -33,11 +33,11 @@ build/%.o: src/%.asm
 	mkdir -p $(dir $@)
 	$(AS) $(ASFLAGS) $< -o $@
 
-build/userspace/%.o: src/userspace/%.c
+build/userspace/%.o: src/sekura/userspace/%.c
 	mkdir -p $(dir $@)
 	$(CC) $(USER_CFLAGS) -c $< -o $@
 
-build/userspace/%.o: src/userspace/%.asm
+build/userspace/%.o: src/sekura/userspace/%.asm
 	mkdir -p $(dir $@)
 	$(AS) $(ASFLAGS) $< -o $@
 
