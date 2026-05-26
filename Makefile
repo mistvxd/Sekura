@@ -2,7 +2,7 @@ CC = clang
 AS = nasm
 LD = ld.lld
 
-CFLAGS = -ffreestanding -fno-stack-protector -mno-red-zone -m64 -Isrc
+CFLAGS = -ffreestanding -fno-stack-protector -mno-red-zone -m64 -Isrc -mcmodel=kernel
 USER_CFLAGS = -ffreestanding -fno-stack-protector -mno-red-zone -m64 -nostdlib -Iinclude
 ASFLAGS = -f elf64
 

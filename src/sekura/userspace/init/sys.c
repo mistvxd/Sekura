@@ -18,7 +18,20 @@ uint64_t w_write(uint64_t fd, char* buf) {
     return ret;
 }
 
+uint64_t w_read(uint64_t fd, void* buf, uint64_t count) {
+    return syscall_wr(0, fd, (uint64_t)buf, count);
+}
+
 void sys_init() {
-    w_write(1, "sistema funcionano\n");
-    w_write(1, "o gui eh viado\n");
+    // input test
+    char buf[128];
+    w_write(1, "> ");
+    while (1) {
+        uint64_t n = w_read(0, buf, sizeof(buf) - 1);
+        buf[n] = 0;
+        if (n > 0) {
+            buf[n] = 0;
+            w_write(1, buf);
+        }
+    }
 }

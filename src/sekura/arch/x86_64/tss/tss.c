@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include <string.h>
-#include <sekura/arch/tss.h>
+#include <sekura/arch/x86_64/tss/tss.h>
 #include <sekura/tools/memset.h>
 
 struct tss tss_entry;

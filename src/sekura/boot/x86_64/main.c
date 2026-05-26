@@ -5,8 +5,9 @@
 #include <sekura/memory/pmm/pmm.h>
 #include <sekura/serial/serial.h>
 #include <sekura/memory/vmm/vmm.h>
-#include <sekura/arch/gdt.h>
-#include <sekura/arch/tss.h>
+#include <sekura/arch/x86_64/tss/tss.h>
+#include <sekura/arch/x86_64/gdt/gdt.h>
+#include <sekura/arch/x86_64/idt/idt.h>
 #include <sekura/filesystem/tmpfs/tmpfs.h>
 #include <sekura/filesystem/tmpfs/tmpfs.h>
 #include <sekura/tools/memcmp.h>
@@ -41,7 +42,7 @@ static volatile struct limine_hhdm_request hhdm_request = {
 __attribute__((used, section(".limine_requests_end")))
 static volatile LIMINE_REQUESTS_END_MARKER;
 
-static void halt(void) {
+void halt(void) {
     serial_write("===== [HALTED] =====\n\n");
     for (;;) {
         __asm__ volatile ("hlt");
@@ -76,6 +77,7 @@ extern void user_entry();
 extern uint64_t syscall_entry();
 
 void kernel_main(void) {
+    serial_write("\n<    LIMINE BOOTSTRAP    >\n");
     serial_write("\n[LIMINE REQUESTS SANITY CHECK]\n");
     serial_write("  [ Framebuffer : ");
     if (framebuffer_request.response) serial_write("PASS  ]\n"); else { serial_write("ERROR ] Halting...\n"); halt(); }  
@@ -111,13 +113,14 @@ void kernel_main(void) {
 
     tss_initialize(kernel_stack_top);
     gdt_initialize();
+    idt_init();
 
     pmm_push_memmap(memmap_rsp);
     pmm_initialize(0);
 
     pmm_prepare_bitmap(hhdm, 0);
 
-    serial_write("\n[SEKURA OUTPUT]\n");
+    serial_write("\n<     SEKURA OUTPUT      >\n");
 
     /*
 
@@ -162,7 +165,7 @@ void kernel_main(void) {
 
     memcpy((void*)(phys + hhdm), user_content->data, user_content->size);
 
-    serial_write("\n==[Switching to Userland]\n\n");
+    serial_write("\nSwitching to Userspace\n\n");
 
     // switches to ring 3 and jumps to usercode
     user_entry();

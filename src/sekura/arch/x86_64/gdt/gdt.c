@@ -1,6 +1,6 @@
 #include <stdint.h>
-#include <sekura/arch/gdt.h>
-#include <sekura/arch/tss.h>
+#include <sekura/arch/x86_64/gdt/gdt.h>
+#include <sekura/arch/x86_64/tss/tss.h>
 
 extern void gdt_load(struct gdt_ptr* gdtp);
 extern void tss_load(void);
