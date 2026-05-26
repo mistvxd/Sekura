@@ -2,21 +2,24 @@ CC = clang
 AS = nasm
 LD = ld.lld
 
+USERSPACE_DIR = src/sekura/userspace
+
 CFLAGS = -ffreestanding -fno-stack-protector -mno-red-zone -m64 -Isrc -mcmodel=kernel
 USER_CFLAGS = -ffreestanding -fno-stack-protector -mno-red-zone -m64 -nostdlib -Iinclude
+
 ASFLAGS = -f elf64
 
-KERNEL_SRC_C = $(shell find src -path "src/sekura/userspace" -prune -o -name "*.c" -print)
-KERNEL_SRC_ASM = $(shell find src -path "src/sekura/userspace" -prune -o -name "*.asm" -print)
+KERNEL_SRC_C = $(shell find src -path "$(USERSPACE_DIR)" -prune -o -name "*.c" -print)
+KERNEL_SRC_ASM = $(shell find src -path "$(USERSPACE_DIR)" -prune -o -name "*.asm" -print)
 
-USER_SRC_C = $(shell find src/sekura/userspace -name "*.c")
-USER_SRC_ASM = $(shell find src/sekura/userspace -name "*.asm")
+USER_SRC_C = $(shell find $(USERSPACE_DIR) -name "*.c")
+USER_SRC_ASM = $(shell find $(USERSPACE_DIR) -name "*.asm")
 
 KERNEL_OBJ_C = $(patsubst src/%.c, build/%.o, $(KERNEL_SRC_C))
 KERNEL_OBJ_ASM = $(patsubst src/%.asm, build/%.o, $(KERNEL_SRC_ASM))
 
-USER_OBJ_C = $(patsubst src/sekura/userspace/%.c, build/userspace/%.o, $(USER_SRC_C))
-USER_OBJ_ASM = $(patsubst src/sekura/userspace/%.asm, build/userspace/%.o, $(USER_SRC_ASM))
+USER_OBJ_C = $(patsubst $(USERSPACE_DIR)/%.c, build/userspace/%.o, $(USER_SRC_C))
+USER_OBJ_ASM = $(patsubst $(USERSPACE_DIR)/%.asm, build/userspace/%.o, $(USER_SRC_ASM))
 
 KERNEL_OBJS = $(KERNEL_OBJ_C) $(KERNEL_OBJ_ASM)
 USER_OBJS = $(USER_OBJ_C) $(USER_OBJ_ASM)
@@ -33,11 +36,11 @@ build/%.o: src/%.asm
 	mkdir -p $(dir $@)
 	$(AS) $(ASFLAGS) $< -o $@
 
-build/userspace/%.o: src/sekura/userspace/%.c
+build/userspace/%.o: $(USERSPACE_DIR)/%.c
 	mkdir -p $(dir $@)
 	$(CC) $(USER_CFLAGS) -c $< -o $@
 
-build/userspace/%.o: src/sekura/userspace/%.asm
+build/userspace/%.o: $(USERSPACE_DIR)/%.asm
 	mkdir -p $(dir $@)
 	$(AS) $(ASFLAGS) $< -o $@
 
@@ -54,22 +57,49 @@ build/userspace.bin: build/userspace.elf
 
 disk.img: build/userspace.bin
 	rm -f disk.img
+
 	dd if=/dev/zero of=disk.img bs=1M count=10
-	dd if=build/userspace.bin of=disk.img bs=512 seek=1 conv=notrunc
+
+	dd if=build/userspace.bin \
+	   of=disk.img \
+	   bs=512 \
+	   seek=1 \
+	   conv=notrunc
 
 sekura.iso: iso_root/boot/kernel.elf
 	mkdir -p iso_root
-	xorriso -as mkisofs -b boot/limine/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot boot/limine/limine-uefi-cd.bin -efi-boot-part --efi-boot-image --protective-msdos-label iso_root -o sekura.iso
+
+	xorriso -as mkisofs \
+	-b boot/limine/limine-bios-cd.bin \
+	-no-emul-boot \
+	-boot-load-size 4 \
+	-boot-info-table \
+	--efi-boot boot/limine/limine-uefi-cd.bin \
+	-efi-boot-part \
+	--efi-boot-image \
+	--protective-msdos-label \
+	iso_root \
+	-o sekura.iso
+
 	limine/limine bios-install sekura.iso
 
 run: all
-	qemu-system-x86_64 -cdrom sekura.iso -drive format=raw,file=disk.img -serial stdio
+	qemu-system-x86_64 \
+	-cdrom sekura.iso \
+	-drive format=raw,file=disk.img \
+	-serial stdio
 
 debug: all
-	qemu-system-x86_64 -cdrom sekura.iso -drive format=raw,file=disk.img -serial stdio -d int,cpu_reset -no-reboot -no-shutdown
+	qemu-system-x86_64 \
+	-cdrom sekura.iso \
+	-drive format=raw,file=disk.img \
+	-serial stdio \
+	-d int,cpu_reset \
+	-no-reboot \
+	-no-shutdown
 
 clean:
 	rm -rf build
 	rm -f sekura.iso
-	rm -f iso_root/boot/kernel.elf
 	rm -f disk.img
+	rm -f iso_root/boot/kernel.elf
