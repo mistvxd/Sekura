@@ -3,7 +3,6 @@ disk.img
 *.iso
 *.o
 *.elf
-*.bin
 *.log
 
 .vscode/
