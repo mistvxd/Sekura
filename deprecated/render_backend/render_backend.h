@@ -1,6 +1,6 @@
 #include <stdint.h>
-#include <sekura/render_backend/render_task.h>
-#include <sekura/surface/surface.h>
+#include <render_backend/render_task.h>
+#include <surface/surface.h>
 
 #define MAX_TASKS 1024
 

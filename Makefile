@@ -2,27 +2,20 @@ CC = clang
 AS = nasm
 LD = ld.lld
 
-USERSPACE_DIR = src/sekura/userspace
-
-CFLAGS = -ffreestanding -fno-stack-protector -mno-red-zone -m64 -Isrc -mcmodel=kernel
-USER_CFLAGS = -ffreestanding -fno-stack-protector -mno-red-zone -m64 -nostdlib -Iinclude
+CFLAGS = -ffreestanding -fno-stack-protector \
+          -mno-red-zone -m64 -Isrc -mcmodel=kernel
 
 ASFLAGS = -f elf64
 
-KERNEL_SRC_C = $(shell find src -path "$(USERSPACE_DIR)" -prune -o -name "*.c" -print)
-KERNEL_SRC_ASM = $(shell find src -path "$(USERSPACE_DIR)" -prune -o -name "*.asm" -print)
+USERSPACE_BIN ?= ../rootfs/sysinit/userspace.bin
 
-USER_SRC_C = $(shell find $(USERSPACE_DIR) -name "*.c")
-USER_SRC_ASM = $(shell find $(USERSPACE_DIR) -name "*.asm")
+KERNEL_SRC_C = $(shell find src -name "*.c")
+KERNEL_SRC_ASM = $(shell find src -name "*.asm")
 
 KERNEL_OBJ_C = $(patsubst src/%.c, build/%.o, $(KERNEL_SRC_C))
 KERNEL_OBJ_ASM = $(patsubst src/%.asm, build/%.o, $(KERNEL_SRC_ASM))
 
-USER_OBJ_C = $(patsubst $(USERSPACE_DIR)/%.c, build/userspace/%.o, $(USER_SRC_C))
-USER_OBJ_ASM = $(patsubst $(USERSPACE_DIR)/%.asm, build/userspace/%.o, $(USER_SRC_ASM))
-
 KERNEL_OBJS = $(KERNEL_OBJ_C) $(KERNEL_OBJ_ASM)
-USER_OBJS = $(USER_OBJ_C) $(USER_OBJ_ASM)
 
 .PHONY: all run debug clean
 
@@ -36,31 +29,16 @@ build/%.o: src/%.asm
 	mkdir -p $(dir $@)
 	$(AS) $(ASFLAGS) $< -o $@
 
-build/userspace/%.o: $(USERSPACE_DIR)/%.c
-	mkdir -p $(dir $@)
-	$(CC) $(USER_CFLAGS) -c $< -o $@
-
-build/userspace/%.o: $(USERSPACE_DIR)/%.asm
-	mkdir -p $(dir $@)
-	$(AS) $(ASFLAGS) $< -o $@
-
 iso_root/boot/kernel.elf: $(KERNEL_OBJS)
 	mkdir -p iso_root/boot
 	$(LD) -T linker.ld $(KERNEL_OBJS) -o iso_root/boot/kernel.elf
 
-build/userspace.elf: $(USER_OBJS)
-	mkdir -p build
-	$(LD) -N -T user_linker.ld $(USER_OBJS) -o build/userspace.elf
-
-build/userspace.bin: build/userspace.elf
-	objcopy -O binary build/userspace.elf build/userspace.bin
-
-disk.img: build/userspace.bin
+disk.img: $(USERSPACE_BIN)
 	rm -f disk.img
 
 	dd if=/dev/zero of=disk.img bs=1M count=10
 
-	dd if=build/userspace.bin \
+	dd if=$(USERSPACE_BIN) \
 	   of=disk.img \
 	   bs=512 \
 	   seek=1 \

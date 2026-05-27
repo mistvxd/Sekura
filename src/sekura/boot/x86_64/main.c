@@ -14,6 +14,7 @@
 #include <sekura/tools/string.h>
 #include <sekura/tools/memset.h>
 #include <sekura/kdrivers/disk.h>
+#include <sekura/process/process.h>
 
 __attribute__((used, section(".limine_requests_start")))
 static volatile LIMINE_REQUESTS_START_MARKER;
@@ -76,6 +77,15 @@ extern void user_entry();
 
 extern uint64_t syscall_entry();
 
+typedef struct {
+    uint32_t* framebuffer;
+
+    uint32_t width;
+    uint32_t height;
+
+    uint32_t pitch;
+} framebuffer_info_t;
+
 void kernel_main(void) {
     serial_write("\n<    LIMINE BOOTSTRAP    >\n");
     serial_write("\n[LIMINE REQUESTS SANITY CHECK]\n");
@@ -122,53 +132,5 @@ void kernel_main(void) {
 
     serial_write("\n<     SEKURA OUTPUT      >\n");
 
-    /*
-
-    TODO: migrate this to userland
-
-    SekuraFramebuffer framebuffer = {
-        .pixels = fb_rsp->address,
-        .height = fb_rsp->height,
-        .width = fb_rsp->width,
-        .pitch = fb_rsp->pitch
-    };
-
-    for (size_t y = 0; y < framebuffer.height; y++) {
-        for (size_t x = 0; x < framebuffer.width; x++) {
-            uint32_t nX = x * 255 / framebuffer.width;
-            uint32_t nY = y * 255 / framebuffer.height;
-            framebuffer.pixels[y * (framebuffer.pitch / 4) + x] = (nY << 8) | nX;
-        }
-    }
-
-    */
-
-    // userland code/stack copying and mapping
-
-    uint64_t phys = pmm_alloc_page(0, 0);
-    uint64_t stackphys1 = pmm_alloc_page(0, 0);
-    uint64_t stackphys2 = pmm_alloc_page(0, 0);
-    if (!phys || !stackphys1 || !stackphys2) halt();
-
-    vmm_map_page(0x400000, phys, 0x07, hhdm);
-
-    vmm_map_page(0x500000, stackphys1, 0x07, hhdm);
-    vmm_map_page(0x501000, stackphys2, 0x07, hhdm);
-
-    TempFS fs;
-    tmpfs_init(&fs);
-
-    TempFile *user_content = tmpfs_find(&fs, 1, 512);
-    if (!user_content) {
-        halt();
-    }
-
-    memcpy((void*)(phys + hhdm), user_content->data, user_content->size);
-
-    serial_write("\nSwitching to Userspace\n\n");
-
-    // switches to ring 3 and jumps to usercode
-    user_entry();
-
-    __builtin_unreachable();
+    create_process(1);
 }

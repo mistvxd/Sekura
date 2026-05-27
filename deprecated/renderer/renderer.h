@@ -1,6 +1,6 @@
 #include <stdint.h>
-#include <sekura/surface/surface.h>
-#include <sekura/render_backend/render_backend.h>
+#include <surface/surface.h>
+#include <render_backend/render_backend.h>
 
 typedef struct {
     SekuraSurface surface;

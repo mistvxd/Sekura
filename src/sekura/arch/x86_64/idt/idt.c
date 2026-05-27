@@ -2,6 +2,7 @@
 #include <sekura/arch/x86_64/idt/idt.h>
 #include <sekura/serial/serial.h>
 #include <sekura/arch/x86_64/idt/pic.h>
+#include <sekura/arch/x86_64/events/events.h>
 
 static idt_entry_t idt[IDT_ENTRIES];
 static idtr_t idtr;
@@ -11,6 +12,8 @@ extern void halt();
 
 char keyboard_buffer[64];
 size_t kbf_unread;
+
+static uint8_t key_states[256];
 
 static inline void lidt(idtr_t* idtr_ptr) {
     __asm__ volatile("lidt (%0)" : : "r"(idtr_ptr));
@@ -117,7 +120,8 @@ static const char keyboard_map[128] = {
 };
 
 void keyboard_handler() {
-    uint8_t scancode = inb(0x60);
+    uint8_t scancode =
+        (uint8_t)inb(0x60);
 
     if (scancode & 0x80) {
         pic_eoi(1);
@@ -126,10 +130,22 @@ void keyboard_handler() {
 
     char c = keyboard_map[scancode];
 
-    if (c) {
-        keyboard_buffer[kbf_unread] = c;
-        kbf_unread++;
+    if (!c) {
+        pic_eoi(1);
+        return;
     }
+
+    keyboard_buffer[kbf_unread] = c;
+    kbf_unread++;
+
+    event_t ev = {
+        .type = EVENT_KEYBOARD,
+        .data0 = c,
+        .data1 = 0,
+        .timestamp = 0
+    };
+
+    event_push(&ev);
 
     pic_eoi(1);
 }
