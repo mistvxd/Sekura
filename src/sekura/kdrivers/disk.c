@@ -158,3 +158,28 @@ int ata_read_sector(uint64_t lba, uint16_t *buffer) {
     }
     return 0;
 }
+
+int ata_read(
+    uint64_t lba,
+    uint32_t sectors,
+    void* buffer
+) {
+    uint16_t* ptr = buffer;
+
+    for (
+        uint32_t s = 0;
+        s < sectors;
+        s++
+    ) {
+        int r =
+            ata_read_sector(
+                lba + s,
+                ptr + (s * 256)
+            );
+
+        if (r < 0)
+            return r;
+    }
+
+    return 0;
+}

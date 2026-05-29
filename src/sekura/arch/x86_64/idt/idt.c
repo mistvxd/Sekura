@@ -87,67 +87,25 @@ static inline uint8_t inb(uint16_t port) {
     return ret;
 }
 
-static const char keyboard_map[128] = {
-    0,
-    27,
-    '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
-    '-', '=',
-    '\b',
-    '\t',
-
-    'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p',
-    '[', ']',
-    '\n',
-
-    0,
-
-    'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l',
-    ';', '\'',
-    '`',
-
-    0,
-
-    '\\',
-
-    'z', 'x', 'c', 'v', 'b', 'n', 'm',
-    ',', '.', '/',
-
-    0,
-    '*',
-
-    0,
-    ' ',
-};
+int enter;
 
 void keyboard_handler() {
-    uint8_t scancode =
-        (uint8_t)inb(0x60);
+    uint8_t status = inb(0x64); if (!(status & 1)) { pic_eoi(1); return; }
+    uint8_t scancode = (uint8_t)inb(0x60);
 
-    if (scancode & 0x80) {
-        pic_eoi(1);
-        return;
-    }
-
-    char c = keyboard_map[scancode];
-
-    if (!c) {
-        pic_eoi(1);
-        return;
-    }
-
-    keyboard_buffer[kbf_unread] = c;
+    keyboard_buffer[kbf_unread] = scancode;
     kbf_unread++;
 
     event_t ev = {
         .type = EVENT_KEYBOARD,
-        .data0 = c,
+        .data0 = scancode,
         .data1 = 0,
         .timestamp = 0
     };
 
     event_push(&ev);
 
-    pic_eoi(1);
+    pic_eoi(0x20);
 }
 
 __attribute__((naked))
@@ -158,10 +116,17 @@ void keyboard_stub() {
     );
 }
 
+__attribute__((naked))
+void putaquepariu() {
+    __asm__ volatile(
+        "iretq"
+    );
+}
+
 void idt_init() {
     cli();
 
-    for (int i = 0; i < 256; i++) {
+    for (int i = 0; i < 31; i++) {
         idt_set_gate(i, isr_common, 0x8E);
     }
 
@@ -172,6 +137,7 @@ void idt_init() {
 
     pic_remap();
 
+    idt_set_gate(0x20, putaquepariu, 0x8E);
     idt_set_gate(0x21, keyboard_stub, 0x8E);
 
     sti();

@@ -34,13 +34,9 @@ void pic_remap() {
     outb(0x21, 0x01);
     outb(0xA1, 0x01);
 
-    // restore masks
-    outb(0x21, master_mask);
-    outb(0xA1, slave_mask);
-
     // enables IRQ1
-    outb(0x21, 0xFD);
-    outb(0xA1, 0xFF);
+    //outb(0x21, 0xFD);
+    //outb(0xA1, 0xFF);
 }
 
 void pic_eoi(uint8_t irq) {

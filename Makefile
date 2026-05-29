@@ -7,7 +7,7 @@ CFLAGS = -ffreestanding -fno-stack-protector \
 
 ASFLAGS = -f elf64
 
-USERSPACE_BIN ?= ../rootfs/sysinit/userspace.bin
+USERSPACE_ELF ?= ../rootfs/sysinit/userspace.elf
 
 KERNEL_SRC_C = $(shell find src -name "*.c")
 KERNEL_SRC_ASM = $(shell find src -name "*.asm")
@@ -33,12 +33,12 @@ iso_root/boot/kernel.elf: $(KERNEL_OBJS)
 	mkdir -p iso_root/boot
 	$(LD) -T linker.ld $(KERNEL_OBJS) -o iso_root/boot/kernel.elf
 
-disk.img: $(USERSPACE_BIN)
+disk.img: $(USERSPACE_ELF)
 	rm -f disk.img
 
 	dd if=/dev/zero of=disk.img bs=1M count=10
 
-	dd if=$(USERSPACE_BIN) \
+	dd if=$(USERSPACE_ELF) \
 	   of=disk.img \
 	   bs=512 \
 	   seek=1 \
