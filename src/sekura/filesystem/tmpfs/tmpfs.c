@@ -41,9 +41,6 @@ TempFile* tmpfs_find(
     }
 
     for (uint32_t i = 0; i < sectors; i++) {
-        serial_write("SECTOR: ");
-        serial_write_int(i);
-        serial_write_char('\n');
         ata_read_sector(
             sector + i,
             (uint16_t*)(buffer + (i * SECTOR_SIZE))

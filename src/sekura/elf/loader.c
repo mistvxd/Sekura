@@ -85,8 +85,5 @@ int elf_load(
 
     *entry = ehdr->entry;
 
-    serial_write_int(ehdr->entry);
-    serial_write("\n");
-
     return 1;
 }

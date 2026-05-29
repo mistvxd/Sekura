@@ -35,8 +35,8 @@ void pic_remap() {
     outb(0xA1, 0x01);
 
     // enables IRQ1
-    //outb(0x21, 0xFD);
-    //outb(0xA1, 0xFF);
+    outb(0x21, 0xFD);
+    outb(0xA1, 0xFF);
 }
 
 void pic_eoi(uint8_t irq) {
