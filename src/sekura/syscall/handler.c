@@ -6,10 +6,17 @@
 #include <sekura/tools/memset.h>
 #include <sekura/arch/x86_64/idt/idt.h>
 #include <sekura/arch/x86_64/events/events.h>
+#include <sekura/syscall/upcall.h>
 #include <stddef.h>
 
 extern char keyboard_buffer[64];
 extern size_t kbf_unread;
+
+uint64_t irq_handlers[256];
+
+uint64_t* current_syscall_frame;
+
+int ready;
 
 static inline void outb(uint16_t port, uint8_t val) {
     asm volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
@@ -78,6 +85,20 @@ int64_t sys_outb(uint16_t port, uint8_t value) {
     return 0;
 }
 
+int64_t sys_regup(uint8_t vector, uint64_t handler) {
+    if (handler < 0x400000 || handler > 0x999999) return -1;
+    irq_handlers[vector] = handler;
+    ready = 1;
+    return 0;
+}
+
+void sys_upret() {
+    extern uint64_t retaddr;
+    current_syscall_frame[1] = retaddr;
+    ready = 1;
+    return;
+}
+
 uint64_t syscall_dispatch(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6) {
     // handlers interface
     
@@ -95,6 +116,12 @@ uint64_t syscall_dispatch(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, ui
 
         case SYSCALL_OUTB:
             return sys_outb((uint16_t)a1, (uint8_t)a2);
+
+        case SYSCALL_REGUP:
+            return sys_regup((uint8_t)a1, a2);
+
+        case SYSCALL_UPRET:
+            sys_upret();
 
         default:
             return -1;

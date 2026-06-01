@@ -87,7 +87,7 @@ typedef struct {
 } framebuffer_info_t;
 
 void kernel_main(void) {
-    serial_write("\n<    LIMINE BOOTSTRAP    >\n");
+    serial_write("\n<     LIMINE BOOTSTRAP     >\n");
     serial_write("\n[LIMINE REQUESTS SANITY CHECK]\n");
     serial_write("  [ Framebuffer : ");
     if (framebuffer_request.response) serial_write("PASS  ]\n"); else { serial_write("ERROR ] Halting...\n"); halt(); }  
@@ -130,7 +130,7 @@ void kernel_main(void) {
 
     pmm_prepare_bitmap(hhdm, 0);
 
-    serial_write("\n<     SEKURA OUTPUT      >\n");
+    serial_write("\n<      SEKURA OUTPUT       >\n");
 
     create_process(1);
 }

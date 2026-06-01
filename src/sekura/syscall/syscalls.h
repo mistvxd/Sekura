@@ -13,5 +13,7 @@ enum {
     SYSCALL_OPEN   = 2,
     SYSCALL_CLOSE  = 3,
     SYSCALL_INB    = 4,
-    SYSCALL_OUTB   = 5
+    SYSCALL_OUTB   = 5,
+    SYSCALL_REGUP  = 6,
+    SYSCALL_UPRET  = 7
 };

@@ -32,6 +32,24 @@ void serial_write(const char* str) {
     }
 }
 
+void serial_write_hex(uint64_t value) {
+    const char* hex = "0123456789ABCDEF";
+
+    serial_write("0x");
+
+    int started = 0;
+
+    for (int i = 60; i >= 0; i -= 4) {
+        uint8_t digit =
+            (value >> i) & 0xF;
+
+        if (digit || started || i == 0) {
+            started = 1;
+            serial_write_char(hex[digit]);
+        }
+    }
+}
+
 void serial_write_int(uint64_t value) {
     char buffer[21];
 
