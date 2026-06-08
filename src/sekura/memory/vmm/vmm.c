@@ -166,3 +166,13 @@ uint64_t vmm_virt_to_phys(uint64_t virt, uint64_t hhdm) {
     return (pt[pt_i] & 0x000FFFFFFFFFF000)
          | (virt & 0xFFF);
 }
+
+uint64_t vmm_get_cr3(void) {
+    uint64_t cr3;
+    __asm__ volatile ("mov %%cr3, %0" : "=r"(cr3));
+    return cr3;
+}
+
+void vmm_set_cr3(uint64_t cr3) {
+    __asm__ volatile ("mov %0, %%cr3" :: "r"(cr3) : "memory");
+}

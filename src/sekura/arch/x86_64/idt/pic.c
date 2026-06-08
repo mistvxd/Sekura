@@ -34,8 +34,8 @@ void pic_remap() {
     outb(0x21, 0x01);
     outb(0xA1, 0x01);
 
-    // enables IRQ1
-    outb(0x21, 0xFD);
+    // enables IRQ0 and IRQ1 (timer and keyboard)
+    outb(0x21, 0xFC);
     outb(0xA1, 0xFF);
 }
 

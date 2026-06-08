@@ -13,6 +13,8 @@ static idtr_t idtr;
 extern void* isr_stub_table[];
 extern void halt();
 
+extern void irq0();
+
 static inline void lidt(idtr_t* idtr_ptr) {
     __asm__ volatile("lidt (%0)" : : "r"(idtr_ptr));
 }
@@ -32,8 +34,9 @@ void idt_set_gate(uint8_t vector, void* isr, uint8_t flags) {
 void exception_handler(uint64_t* stack) {
     serial_write("\n<      SEKURA WARNING      >\n\n");
     serial_write("> from IDT:\n");
-    serial_write("[  AN EXCEPTION OCCURRED   ]\n");
-    serial_write("[ Resuming current program ]\n\n");
+    serial_write("[  AN EXCEPTION OCCURRED   ]\n\n");
+    serial_write("     SYSTEM MUST HALT    \n\n");
+    halt();
 }
 
 uint64_t read_cr2(void) {
@@ -311,13 +314,6 @@ static inline uint8_t inb(uint16_t port) {
     return ret;
 }
 
-__attribute__((naked))
-void putaquepariu() {
-    __asm__ volatile(
-        "iretq"
-    );
-}
-
 void idt_init() {
     cli();
 
@@ -336,7 +332,7 @@ void idt_init() {
     idt_set_gate(0x0E, isr_pf, 0x8E);
     idt_set_gate(0x08, isr_df, 0x8E);
 
-    idt_set_gate(0x20, putaquepariu, 0x8E);
+    idt_set_gate(0x20, irq0, 0x8E);
     idt_set_gate(0x21, keyboard_stub, 0x8E);
 
     sti();

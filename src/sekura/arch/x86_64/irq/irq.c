@@ -1,6 +1,10 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <sekura/arch/x86_64/idt/pic.h>
+#include <sekura/arch/x86_64/idt/idt.h>
+#include <sekura/process/process.h>
+#include <sekura/scheduler/scheduler.h>
+#include <sekura/serial/serial.h>
 
 uint8_t keyboard_buffer[64];
 size_t kbf_unread;
@@ -27,7 +31,15 @@ void keyboard_handler(uint64_t* stack) {
         keyboard_buffer[kbf_unread++] = scancode;
     }
 
-    pic_eoi(0x20);
+    pic_eoi(1);
+}
+
+static int counter;
+
+void timer_handler(InterruptFrame* frame) {
+    pic_eoi(0);
+
+    scheduler_tick(frame);
 }
 
 __attribute__((naked))

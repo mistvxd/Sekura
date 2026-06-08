@@ -15,8 +15,10 @@
 #include <sekura/tools/memset.h>
 #include <sekura/kdrivers/disk.h>
 #include <sekura/process/process.h>
+#include <sekura/scheduler/scheduler.h>
 
 #define USER_FB 0x7000000000
+#define USER_FB_INFO 0x7000100000
 
 __attribute__((used, section(".limine_requests_start")))
 static volatile LIMINE_REQUESTS_START_MARKER;
@@ -42,6 +44,12 @@ static volatile struct limine_hhdm_request hhdm_request = {
     .revision = 0
 };
 
+__attribute__((used, section(".limine_requests")))
+volatile struct limine_module_request module_request = {
+    .id = LIMINE_MODULE_REQUEST,
+    .revision = 0
+};
+
 __attribute__((used, section(".limine_requests_end")))
 static volatile LIMINE_REQUESTS_END_MARKER;
 
@@ -61,13 +69,12 @@ extern void user_entry();
 extern void enable_syscalls();
 
 typedef struct {
-    uint32_t* framebuffer;
+    uint64_t width;
+    uint64_t height;
+    uint64_t pitch;
+} FramebufferInfo;
 
-    uint32_t width;
-    uint32_t height;
-
-    uint32_t pitch;
-} framebuffer_info_t;
+uint64_t kcr3;
 
 void kernel_main(void) {
     serial_write("\n<     LIMINE BOOTSTRAP     >\n");
@@ -84,9 +91,25 @@ void kernel_main(void) {
     struct limine_memmap_response *memmap_rsp = memmap_request.response;
     struct limine_hhdm_response *hhdm_rsp = hhdm_request.response;
 
+    struct limine_module_response *mod_rsp = module_request.response;
+
+    struct limine_module_response *userspace_mod;
+
+    serial_write("\n<      LIMINE MODULES     >\n");
+
+    for (uint64_t i = 0; i < mod_rsp->module_count; i++) {
+
+        struct limine_file* mod = mod_rsp->modules[i];
+
+        serial_write(mod->path);
+        serial_write("\n");
+    }
+
     hhdm = hhdm_rsp->offset;
 
     uint64_t kernel_stack_top = (uint64_t)(kernel_stack + sizeof(kernel_stack));
+
+    kcr3 = vmm_get_cr3();
 
     serial_initialize();
 
@@ -118,6 +141,10 @@ void kernel_main(void) {
     }
     */
 
+    Process* init = process_create("/rootfs/sysinit/userspace.elf");
+
+    vmm_set_cr3(init->cr3);
+
     uint64_t fb_phys = (uint64_t)fb_rsp->address - hhdm;
 
     uint64_t fb_size = fb_rsp->pitch * fb_rsp->height;
@@ -126,5 +153,16 @@ void kernel_main(void) {
         vmm_map_page(USER_FB + off, fb_phys + off, 0x07, hhdm);
     }
 
-    create_process(1);
+    uint64_t phys = pmm_alloc_page(0, 0);
+
+    FramebufferInfo* fb_info = (FramebufferInfo*)(phys + hhdm);
+    fb_info->width = fb_rsp->width;
+    fb_info->height = fb_rsp->height;
+    fb_info->pitch = fb_rsp->pitch;
+
+    vmm_map_page(USER_FB_INFO, phys, 0x07, hhdm);
+
+    vmm_set_cr3(kcr3);
+
+    scheduler_start();
 }
