@@ -4,6 +4,7 @@
 #include <sekura/arch/x86_64/idt/pic.h>
 #include <sekura/arch/x86_64/events/events.h>
 #include <stdint.h>
+#include <sekura/arch/x86_64/irq/irq.h>
 #include <sekura/syscall/upcall.h>
 
 static idt_entry_t idt[IDT_ENTRIES];
@@ -11,11 +12,6 @@ static idtr_t idtr;
 
 extern void* isr_stub_table[];
 extern void halt();
-
-char keyboard_buffer[64];
-size_t kbf_unread;
-
-static uint8_t key_states[256];
 
 static inline void lidt(idtr_t* idtr_ptr) {
     __asm__ volatile("lidt (%0)" : : "r"(idtr_ptr));
@@ -281,6 +277,15 @@ void isr_df() {
         "call df_handler\n"
 
         "hlt\n"
+        "hlt\n"
+        "hlt\n"
+        "hlt\n"
+        "hlt\n"
+        "hlt\n"
+        "hlt\n"
+        "hlt\n"
+        "hlt\n"
+        "hlt\n"
     );
 }
 
@@ -304,51 +309,6 @@ static inline uint8_t inb(uint16_t port) {
         : "Nd"(port));
 
     return ret;
-}
-
-uint8_t lastsc;
-
-uint64_t retaddr;
-
-void keyboard_handler(uint64_t* stack) {
-    uint8_t status = inb(0x64); if (!(status & 1)) { pic_eoi(1); return; }
-    uint8_t scancode = (uint8_t)inb(0x60);
-
-    extern uint64_t irq_handlers[256];
-    extern int ready;
-
-    if (!ready) {pic_eoi(0x20); return;}
-
-    ready = 0;
-
-    retaddr = stack[0];
-
-    if (irq_handlers[1]) stack[0] = irq_handlers[1];
-
-    keyboard_buffer[kbf_unread] = scancode;
-    kbf_unread++;
-
-    event_t ev = {
-        .type = EVENT_KEYBOARD,
-        .data0 = scancode,
-        .data1 = 0,
-        .timestamp = 0
-    };
-
-    event_push(&ev);
-
-    pic_eoi(0x20);
-}
-
-__attribute__((naked))
-void keyboard_stub() {
-    __asm__ volatile(
-        "mov %rsp, %rdi\n"
-        "sub $8, %rsp\n"
-        "call keyboard_handler\n"
-        "add $8, %rsp\n"
-        "iretq\n"
-    );
 }
 
 __attribute__((naked))

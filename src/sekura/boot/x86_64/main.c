@@ -16,6 +16,8 @@
 #include <sekura/kdrivers/disk.h>
 #include <sekura/process/process.h>
 
+#define USER_FB 0x7000000000
+
 __attribute__((used, section(".limine_requests_start")))
 static volatile LIMINE_REQUESTS_START_MARKER;
 
@@ -50,32 +52,13 @@ void halt(void) {
     }
 }
 
-static inline void wrmsr(uint32_t msr, uint64_t val) {
-    asm volatile ("wrmsr" :: "c"(msr), "a"(val), "d"(val >> 32));
-}
-
-static inline uint64_t rdmsr(uint32_t msr)
-{
-    uint32_t low;
-    uint32_t high;
-
-    asm volatile(
-        "rdmsr"
-        : "=a"(low), "=d"(high)
-        : "c"(msr)
-    );
-
-    return ((uint64_t)high << 32) | low;
-}
-
 static uint8_t kernel_stack[4096 * 4];
 uint8_t kernel_syscall_stack[4096 * 4];
 
 uint64_t hhdm;
 
 extern void user_entry();
-
-extern uint64_t syscall_entry();
+extern void enable_syscalls();
 
 typedef struct {
     uint32_t* framebuffer;
@@ -109,17 +92,7 @@ void kernel_main(void) {
 
     ata_disk_init();
 
-    // enables syscalls
-
-    wrmsr(0xC0000081, 0x0013001B00080000ULL);
-    wrmsr(0xC0000082, (uint64_t)syscall_entry);
-    wrmsr(0xC0000084, 0x200ULL);
-
-    uint64_t efer = rdmsr(0xC0000080);
-    efer |= 1;
-    wrmsr(0xC0000080, efer);
-
-    // ^ end
+    enable_syscalls();
 
     tss_initialize(kernel_stack_top);
     gdt_initialize();
@@ -131,6 +104,27 @@ void kernel_main(void) {
     pmm_prepare_bitmap(hhdm, 0);
 
     serial_write("\n<      SEKURA OUTPUT       >\n");
+    /*
+    for (int y = 0; y < fb_rsp->height; y++) {
+        for (int x = 0; x < fb_rsp->width; x++) {
+
+            uint8_t r = (x * 255) / fb_rsp->width;
+            uint8_t g = (y * 255) / fb_rsp->height;
+            uint8_t b = ((x + y) * 255) / (fb_rsp->width + fb_rsp->height);
+
+            ((uint32_t*)fb_rsp->address)[y * fb_rsp->pitch / 4 + x] =
+                (r << 16) | (g << 8) | b;
+        }
+    }
+    */
+
+    uint64_t fb_phys = (uint64_t)fb_rsp->address - hhdm;
+
+    uint64_t fb_size = fb_rsp->pitch * fb_rsp->height;
+
+    for (uint64_t off = 0; off < fb_size; off += 4096) {
+        vmm_map_page(USER_FB + off, fb_phys + off, 0x07, hhdm);
+    }
 
     create_process(1);
 }

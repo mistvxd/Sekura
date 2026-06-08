@@ -1,55 +1,101 @@
 #include <stdint.h>
 #include <stddef.h>
+#include <sekura/tools/memset.h>
 #include <sekura/memory/vmm/vmm.h>
 #include <sekura/memory/pmm/pmm.h>
 
-void vmm_map_page(uint64_t virt, uint64_t phys, uint64_t flags, uint64_t hhdm) {
+static uint64_t* get_next_level(
+    uint64_t* table,
+    uint64_t index,
+    uint64_t flags,
+    uint64_t hhdm
+) {
+    if (!(table[index] & 1)) {
+
+        uint64_t phys =
+            (uint64_t)pmm_alloc_page(0, 0);
+
+        uint64_t* virt =
+            (uint64_t*)(phys + hhdm);
+
+        memset(virt, 0, 4096);
+
+        table[index] =
+            phys | flags;
+    }
+
+    return (uint64_t*)
+        ((table[index] & 0x000FFFFFFFFFF000)
+        + hhdm);
+}
+
+void vmm_map_page(
+    uint64_t virt,
+    uint64_t phys,
+    uint64_t flags,
+    uint64_t hhdm
+) {
     uint64_t cr3;
-    __asm__ volatile ("mov %%cr3, %0" : "=r"(cr3));
 
-    uint64_t *pml4 = (uint64_t *)(cr3 + hhdm);
+    asm volatile(
+        "mov %%cr3, %0"
+        : "=r"(cr3)
+    );
 
-    uint64_t pml4_i = (virt >> 39) & 0x1FF;
-    uint64_t pdpt_i = (virt >> 30) & 0x1FF;
-    uint64_t pd_i = (virt >> 21) & 0x1FF;
-    uint64_t pt_i = (virt >> 12) & 0x1FF;
+    cr3 &= 0x000FFFFFFFFFF000;
 
-    if (!(pml4[pml4_i] & 1)) {
-        uint64_t new_pdpt = (uint64_t)pmm_alloc_page(0, 0);
-        uint64_t *vnew_pdpt = (uint64_t *)(new_pdpt + hhdm);
+    uint64_t* pml4 =
+        (uint64_t*)(cr3 + hhdm);
 
-        for (int i = 0; i < 512; i++) vnew_pdpt[i] = 0;
+    uint64_t pml4_i =
+        (virt >> 39) & 0x1FF;
 
-        pml4[pml4_i] = new_pdpt | flags;
-    }
+    uint64_t pdpt_i =
+        (virt >> 30) & 0x1FF;
 
-    uint64_t *pdpt = (uint64_t *)((pml4[pml4_i] & 0x000FFFFFFFFFF000) + hhdm);
+    uint64_t pd_i =
+        (virt >> 21) & 0x1FF;
 
-    if (!(pdpt[pdpt_i] & 1)) {
-        uint64_t new_pd = (uint64_t)pmm_alloc_page(0, 0);
-        uint64_t *vnew_pd = (uint64_t *)(new_pd + hhdm);
+    uint64_t pt_i =
+        (virt >> 12) & 0x1FF;
 
-        for (int i = 0; i < 512; i++) vnew_pd[i] = 0;
+    uint64_t table_flags =
+        0x07;
 
-        pdpt[pdpt_i] = new_pd | flags;
-    }
+    uint64_t* pdpt =
+        get_next_level(
+            pml4,
+            pml4_i,
+            table_flags,
+            hhdm
+        );
 
-    uint64_t *pd = (uint64_t *)((pdpt[pdpt_i] & 0x000FFFFFFFFFF000) + hhdm);
+    uint64_t* pd =
+        get_next_level(
+            pdpt,
+            pdpt_i,
+            table_flags,
+            hhdm
+        );
 
-    if (!(pd[pd_i] & 1)) {
-        uint64_t new_pt = (uint64_t)pmm_alloc_page(0, 0);
-        uint64_t *vnew_pt = (uint64_t *)(new_pt + hhdm);
+    uint64_t* pt =
+        get_next_level(
+            pd,
+            pd_i,
+            table_flags,
+            hhdm
+        );
 
-        for (int i = 0; i < 512; i++) vnew_pt[i] = 0;
+    pt[pt_i] =
+        (phys & 0x000FFFFFFFFFF000)
+        | flags;
 
-        pd[pd_i] = new_pt | flags;
-    }
-
-    uint64_t *pt = (uint64_t *)((pd[pd_i] & 0x000FFFFFFFFFF000) + hhdm);
-
-    pt[pt_i] = (phys & 0x000FFFFFFFFFF000) | flags;
-
-    __asm__ volatile ("invlpg (%0)" :: "r"(virt) : "memory");
+    asm volatile(
+        "invlpg (%0)"
+        :
+        : "r"(virt)
+        : "memory"
+    );
 }
 
 void vmm_unmap_page(uint64_t virt, uint64_t hhdm) {
