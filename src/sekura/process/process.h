@@ -69,3 +69,4 @@ extern Process processes[MAX_PROCESSES];
 Process* process_create(const char* path);
 Process* process_current(void);
 void process_run(Process* proc);
+void process_kill(Process* proc);

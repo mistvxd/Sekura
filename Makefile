@@ -59,7 +59,9 @@ sekura.iso: iso_root/boot/kernel.elf iso_root/rootfs
 run: all
 	qemu-system-x86_64 \
 		-cdrom sekura.iso \
-		-serial stdio
+		-serial stdio \
+		-device qemu-xhci \
+		-device usb-host,vendorid=0x046d,productid=0xc534
 
 debug: all
 	qemu-system-x86_64 \
@@ -67,7 +69,7 @@ debug: all
 		-serial stdio \
 		-d int,cpu_reset \
 		-no-reboot \
-		-no-shutdown
+		-no-shutdown \
 
 clean:
 	rm -rf build

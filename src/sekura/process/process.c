@@ -132,3 +132,10 @@ void process_run(Process* proc) {
     vmm_set_cr3(proc->cr3);
     enter_userspace(proc->rip, proc->rsp);
 }
+
+void process_kill(Process* proc) {
+    if (!proc)
+        return;
+
+    proc->alive = 0;
+}

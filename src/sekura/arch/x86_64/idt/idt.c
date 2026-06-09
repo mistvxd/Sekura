@@ -57,10 +57,16 @@ void gpf_handler(uint64_t* stack) {
     uint64_t flags = stack[10];
     uint64_t rsp   = stack[11];
     uint64_t ss    = stack[12];
+
+    uint64_t cr3;
+    asm volatile("mov %%cr3, %0" : "=r"(cr3));
+
     uint64_t cpl = cs & 0x3;
+
     serial_write("\n<    SEKURA FATAL ERROR    >\n\n");
     serial_write("[ GENERAL PROTECTION FAULT ]\n");
     serial_write("\n");
+
     serial_write(" RIP    : ");
     serial_write_hex(rip);
     serial_write("\n");
@@ -72,7 +78,7 @@ void gpf_handler(uint64_t* stack) {
     serial_write(" CS     : ");
     serial_write_hex(cs);
     serial_write("\n");
-    
+
     serial_write(" SS     : ");
     serial_write_hex(ss);
     serial_write("\n");
@@ -81,30 +87,115 @@ void gpf_handler(uint64_t* stack) {
     serial_write_hex(flags);
     serial_write("\n");
 
+    serial_write(" CR3    : ");
+    serial_write_hex(cr3);
+    serial_write("\n");
+
     serial_write(" ERROR  : ");
     serial_write_hex(error);
-    serial_write("\n\n");
+    serial_write("\n");
 
+    serial_write(" +DETAILS:\n");
+
+    serial_write("   EXT      : ");
+    serial_write((error & 1) ? "YES" : "NO");
+    serial_write("\n");
+
+    serial_write("   IDT      : ");
+    serial_write((error & 2) ? "YES" : "NO");
+    serial_write("\n");
+
+    serial_write("   TI       : ");
+    serial_write((error & 4) ? "YES" : "NO");
+    serial_write("\n");
+
+    serial_write("   SELECTOR : ");
+    serial_write_hex(error & ~0x7);
+    serial_write("\n");
+
+    serial_write("\n");
+    serial_write(" +REGISTERS:\n");
+
+    serial_write("   R15 : "); serial_write_hex(stack[0]);  serial_write("\n");
+    serial_write("   R14 : "); serial_write_hex(stack[1]);  serial_write("\n");
+    serial_write("   R13 : "); serial_write_hex(stack[2]);  serial_write("\n");
+    serial_write("   R12 : "); serial_write_hex(stack[3]);  serial_write("\n");
+
+    serial_write("   R11 : "); serial_write_hex(stack[4]);  serial_write("\n");
+    serial_write("   R10 : "); serial_write_hex(stack[5]);  serial_write("\n");
+    serial_write("   R9  : "); serial_write_hex(stack[6]);  serial_write("\n");
+    serial_write("   R8  : "); serial_write_hex(stack[7]);  serial_write("\n");
+
+    serial_write("   RBP : "); serial_write_hex(stack[8]);  serial_write("\n");
+    serial_write("   RDI : "); serial_write_hex(stack[9]);  serial_write("\n");
+    serial_write("   RSI : "); serial_write_hex(stack[10]); serial_write("\n");
+    serial_write("   RDX : "); serial_write_hex(stack[11]); serial_write("\n");
+
+    serial_write("   RCX : "); serial_write_hex(stack[12]); serial_write("\n");
+    serial_write("   RBX : "); serial_write_hex(stack[13]); serial_write("\n");
+    serial_write("   RAX : "); serial_write_hex(stack[14]); serial_write("\n");
+
+    serial_write("\n");
+    serial_write(" +STACK:\n");
+
+    uint64_t page_base =
+        rsp & ~0xFFFULL;
+
+    for (int i = 0; i < 8; i++) {
+        uint64_t addr =
+            rsp + (i * 8);
+
+        if (
+            (addr & ~0xFFFULL)
+            != page_base
+        ) {
+            serial_write(
+                "   [NEXT PAGE]\n"
+            );
+            break;
+        }
+
+        serial_write("   ");
+        serial_write_hex(addr);
+        serial_write(" : ");
+        serial_write_hex(
+            *(uint64_t*)addr
+        );
+        serial_write("\n");
+    }
+
+    serial_write("\n");
     serial_write(" MODE   : ");
-    if (cpl == 3) serial_write("USER"); else serial_write("KERNEL");
+
+    if (cpl == 3)
+        serial_write("USER");
+    else
+        serial_write("KERNEL");
+
     serial_write("\n\n");
     serial_write("     SYSTEM MUST HALT       \n\n");
 }
 
 void pf_handler(uint64_t* stack) {
-    uint64_t rbp   = stack[2];
     uint64_t error = stack[7];
     uint64_t rip   = stack[8];
     uint64_t cs    = stack[9];
     uint64_t flags = stack[10];
     uint64_t rsp   = stack[11];
     uint64_t ss    = stack[12];
+
     uint64_t cr2;
+    uint64_t cr3;
+
     asm volatile("mov %%cr2, %0" : "=r"(cr2));
+    asm volatile("mov %%cr3, %0" : "=r"(cr3));
+
     uint64_t cpl = cs & 0x3;
+
     serial_write("\n<    SEKURA FATAL ERROR    >\n\n");
     serial_write("[        PAGE FAULT        ]\n");
     serial_write("\n");
+
     serial_write(" RIP    : ");
     serial_write_hex(rip);
     serial_write("\n");
@@ -116,7 +207,7 @@ void pf_handler(uint64_t* stack) {
     serial_write(" CS     : ");
     serial_write_hex(cs);
     serial_write("\n");
-    
+
     serial_write(" SS     : ");
     serial_write_hex(ss);
     serial_write("\n");
@@ -129,8 +220,8 @@ void pf_handler(uint64_t* stack) {
     serial_write_hex(cr2);
     serial_write("\n");
 
-    serial_write(" RBP    : ");
-    serial_write_hex(stack[2]);
+    serial_write(" CR3    : ");
+    serial_write_hex(cr3);
     serial_write("\n");
 
     serial_write(" ERROR  : ");
@@ -157,10 +248,67 @@ void pf_handler(uint64_t* stack) {
 
     serial_write("   EXECUTE  : ");
     serial_write((error & 16) ? "YES" : "NO");
-    serial_write("\n\n");
+    serial_write("\n");
 
+    serial_write("\n");
+    serial_write(" +REGISTERS:\n");
+
+    serial_write("   R15 : "); serial_write_hex(stack[0]);  serial_write("\n");
+    serial_write("   R14 : "); serial_write_hex(stack[1]);  serial_write("\n");
+    serial_write("   R13 : "); serial_write_hex(stack[2]);  serial_write("\n");
+    serial_write("   R12 : "); serial_write_hex(stack[3]);  serial_write("\n");
+
+    serial_write("   R11 : "); serial_write_hex(stack[4]);  serial_write("\n");
+    serial_write("   R10 : "); serial_write_hex(stack[5]);  serial_write("\n");
+    serial_write("   R9  : "); serial_write_hex(stack[6]);  serial_write("\n");
+    serial_write("   R8  : "); serial_write_hex(stack[7]);  serial_write("\n");
+
+    serial_write("   RBP : "); serial_write_hex(stack[8]);  serial_write("\n");
+    serial_write("   RDI : "); serial_write_hex(stack[9]);  serial_write("\n");
+    serial_write("   RSI : "); serial_write_hex(stack[10]); serial_write("\n");
+    serial_write("   RDX : "); serial_write_hex(stack[11]); serial_write("\n");
+
+    serial_write("   RCX : "); serial_write_hex(stack[12]); serial_write("\n");
+    serial_write("   RBX : "); serial_write_hex(stack[13]); serial_write("\n");
+    serial_write("   RAX : "); serial_write_hex(stack[14]); serial_write("\n");
+
+    serial_write("\n");
+    serial_write(" +STACK:\n");
+
+    uint64_t page_base =
+        rsp & ~0xFFFULL;
+
+    for (int i = 0; i < 8; i++) {
+        uint64_t addr =
+            rsp + (i * 8);
+
+        if (
+            (addr & ~0xFFFULL)
+            != page_base
+        ) {
+            serial_write(
+                "   [NEXT PAGE]\n"
+            );
+            break;
+        }
+
+        serial_write("   ");
+        serial_write_hex(addr);
+        serial_write(" : ");
+        serial_write_hex(
+            *(uint64_t*)addr
+        );
+        serial_write("\n");
+    }
+
+    serial_write("\n");
     serial_write(" MODE   : ");
-    if (cpl == 3) serial_write("USER"); else serial_write("KERNEL");
+
+    if (cpl == 3)
+        serial_write("USER");
+    else
+        serial_write("KERNEL");
+
     serial_write("\n\n");
     serial_write("      SYSTEM MUST HALT      \n\n");
 }

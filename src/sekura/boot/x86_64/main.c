@@ -16,6 +16,13 @@
 #include <sekura/kdrivers/disk.h>
 #include <sekura/process/process.h>
 #include <sekura/scheduler/scheduler.h>
+#include <sekura/devices/usb/usb.h>
+#include <sekura/devices/usb/xhci.h>
+#include <sekura/devices/usb/xhci_trb.h>
+#include <sekura/devices/usb/xhci_ring.h>
+#include <sekura/devices/usb/xhci_cmd.h>
+#include <sekura/devices/usb/xhci_event.h>
+#include <sekura/devices/pci/pci.h>
 
 #define USER_FB 0x7000000000
 #define USER_FB_INFO 0x7100000000
@@ -141,7 +148,7 @@ void kernel_main(void) {
     }
     */
 
-    Process* init = process_create("/rootfs/sysinit/userspace.elf");
+    Process* init = process_create("/rootfs/sysinit/init.elf");
 
     vmm_set_cr3(init->cr3);
 
@@ -151,6 +158,10 @@ void kernel_main(void) {
 
     for (uint64_t off = 0; off < fb_size; off += 4096) {
         vmm_map_page(USER_FB + off, fb_phys + off, 0x07, hhdm);
+    }
+
+    for (uint64_t off = 0; off < fb_size; off += 4096) {
+        vmm_map_page(0x7200000000 + off, fb_phys + off, 0x07, hhdm);
     }
 
     uint64_t phys = pmm_alloc_page(0, 0);

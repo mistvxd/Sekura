@@ -15,6 +15,8 @@ Process* current_process;
 
 int scheduler_started;
 
+int troubleshooting_requested;
+
 void scheduler_start(void) {
     current_process = &processes[0];
     scheduler_started = 1;
@@ -104,4 +106,8 @@ void scheduler_tick(InterruptFrame* frame) {
         current_process = next;
         process_run(next);
     }
+}
+
+Process* scheduler_current(void) {
+    return current_process;
 }
