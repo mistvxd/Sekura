@@ -18,7 +18,7 @@
 #include <sekura/scheduler/scheduler.h>
 
 #define USER_FB 0x7000000000
-#define USER_FB_INFO 0x7000100000
+#define USER_FB_INFO 0x7100000000
 
 __attribute__((used, section(".limine_requests_start")))
 static volatile LIMINE_REQUESTS_START_MARKER;

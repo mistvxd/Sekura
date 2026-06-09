@@ -97,11 +97,6 @@ Process* process_create(const char* path) {
 
     if (!file)
         return 0;
-    
-    serial_write(file->path);
-    serial_write("\n");
-    serial_write_hex((uint64_t)file->address);
-    serial_write("\n");
 
     proc->cr3 = process_create_cr3();
 
