@@ -67,18 +67,15 @@ static struct limine_file* find_module(const char* path) {
 static uint64_t process_create_stack(void) {
     uint64_t base = next_stack;
 
-    uint64_t page1 = pmm_alloc_page(0, 0);
-    uint64_t page2 = pmm_alloc_page(0, 0);
+    for (int i = 0; i < 4; i++) {
+        uint64_t page = pmm_alloc_page(0, 0);
+        if (!page) halt();
+        vmm_map_page(base + i * 0x1000, page, 0x07, hhdm);
+    }
 
-    if (!page1 || !page2)
-        halt();
+    next_stack += 0x5000;
 
-    vmm_map_page(base, page1, 0x07, hhdm);
-    vmm_map_page(base + 0x1000, page2, 0x07, hhdm);
-
-    next_stack += 0x3000;
-
-    return base + 0x1FF0;
+    return base + 0x3FF0;
 }
 
 static uint64_t process_create_cr3(void) {
@@ -135,6 +132,9 @@ Process* process_create(const char* path) {
     proc->rip = entry;
     proc->alive = 1;
     proc->rflags = 0x202;
+
+    proc->heap_start = 0x10000000;
+    proc->heap_end   = 0x10000000;
 
     vmm_set_cr3(old_cr3);
 

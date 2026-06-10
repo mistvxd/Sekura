@@ -282,3 +282,15 @@ void troubleshooting(const char* error) {
         }
     }
 }
+
+void panic() {
+    fill_rect(glb_fb->address, 0, 0, glb_fb->width, glb_fb->height, 0x000000);
+    draw_text(glb_fb->address, "Sekura PANIC", 30, 30, 0xFF0000, 1);
+    draw_text(glb_fb->address, "Attempting to reboot...", 30, 80, 0xFFFFFF, 1);
+    for (size_t i = 0; i < 70000000; i++) {
+        if (i % 10000000 == 0) {
+            draw_text(glb_fb->address, ".", (30 + (i / 10000000 * 16)), 140, 0xFFFFFF, 1);
+        }
+    };
+    reboot();
+}

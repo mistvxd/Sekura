@@ -16,13 +16,6 @@
 #include <sekura/kdrivers/disk.h>
 #include <sekura/process/process.h>
 #include <sekura/scheduler/scheduler.h>
-#include <sekura/devices/usb/usb.h>
-#include <sekura/devices/usb/xhci.h>
-#include <sekura/devices/usb/xhci_trb.h>
-#include <sekura/devices/usb/xhci_ring.h>
-#include <sekura/devices/usb/xhci_cmd.h>
-#include <sekura/devices/usb/xhci_event.h>
-#include <sekura/devices/pci/pci.h>
 
 #define USER_FB 0x7000000000
 #define USER_FB_INFO 0x7100000000

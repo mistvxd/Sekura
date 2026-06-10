@@ -45,10 +45,29 @@ void timer_handler(InterruptFrame* frame) {
 __attribute__((naked))
 void keyboard_stub() {
     __asm__ volatile(
+        "push %rax\n"
+        "push %rcx\n"
+        "push %rdx\n"
+        "push %rsi\n"
+        "push %rdi\n"
+        "push %r8\n"
+        "push %r9\n"
+        "push %r10\n"
+        "push %r11\n"
+
         "mov %rsp, %rdi\n"
-        "sub $8, %rsp\n"
         "call keyboard_handler\n"
-        "add $8, %rsp\n"
+
+        "pop %r11\n"
+        "pop %r10\n"
+        "pop %r9\n"
+        "pop %r8\n"
+        "pop %rdi\n"
+        "pop %rsi\n"
+        "pop %rdx\n"
+        "pop %rcx\n"
+        "pop %rax\n"
+
         "iretq\n"
     );
 }

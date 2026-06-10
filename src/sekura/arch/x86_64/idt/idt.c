@@ -16,6 +16,7 @@ extern void halt();
 extern void irq0();
 
 extern void troubleshooting(char* error);
+extern void panic(void);
 
 static inline void lidt(idtr_t* idtr_ptr) {
     __asm__ volatile("lidt (%0)" : : "r"(idtr_ptr));
@@ -118,24 +119,14 @@ void gpf_handler(uint64_t* stack) {
     serial_write("\n");
     serial_write(" +REGISTERS:\n");
 
-    serial_write("   R15 : "); serial_write_hex(stack[0]);  serial_write("\n");
-    serial_write("   R14 : "); serial_write_hex(stack[1]);  serial_write("\n");
-    serial_write("   R13 : "); serial_write_hex(stack[2]);  serial_write("\n");
-    serial_write("   R12 : "); serial_write_hex(stack[3]);  serial_write("\n");
+    serial_write("   RDI : "); serial_write_hex(stack[0]); serial_write("\n");
+    serial_write("   RSI : "); serial_write_hex(stack[1]); serial_write("\n");
+    serial_write("   RBP : "); serial_write_hex(stack[2]); serial_write("\n");
+    serial_write("   RBX : "); serial_write_hex(stack[3]); serial_write("\n");
 
-    serial_write("   R11 : "); serial_write_hex(stack[4]);  serial_write("\n");
-    serial_write("   R10 : "); serial_write_hex(stack[5]);  serial_write("\n");
-    serial_write("   R9  : "); serial_write_hex(stack[6]);  serial_write("\n");
-    serial_write("   R8  : "); serial_write_hex(stack[7]);  serial_write("\n");
-
-    serial_write("   RBP : "); serial_write_hex(stack[8]);  serial_write("\n");
-    serial_write("   RDI : "); serial_write_hex(stack[9]);  serial_write("\n");
-    serial_write("   RSI : "); serial_write_hex(stack[10]); serial_write("\n");
-    serial_write("   RDX : "); serial_write_hex(stack[11]); serial_write("\n");
-
-    serial_write("   RCX : "); serial_write_hex(stack[12]); serial_write("\n");
-    serial_write("   RBX : "); serial_write_hex(stack[13]); serial_write("\n");
-    serial_write("   RAX : "); serial_write_hex(stack[14]); serial_write("\n");
+    serial_write("   RDX : "); serial_write_hex(stack[4]); serial_write("\n");
+    serial_write("   RCX : "); serial_write_hex(stack[5]); serial_write("\n");
+    serial_write("   RAX : "); serial_write_hex(stack[6]); serial_write("\n");
 
     serial_write("\n");
     serial_write(" +STACK:\n");
@@ -176,7 +167,7 @@ void gpf_handler(uint64_t* stack) {
 
     serial_write("\n\n");
     serial_write("     SYSTEM MUST HALT       \n\n");
-    troubleshooting("General Protection Fault (#GP)");
+    if (cpl == 3) troubleshooting("General Protection Fault (#GP)"); else panic();
 }
 
 void pf_handler(uint64_t* stack) {
@@ -256,24 +247,14 @@ void pf_handler(uint64_t* stack) {
     serial_write("\n");
     serial_write(" +REGISTERS:\n");
 
-    serial_write("   R15 : "); serial_write_hex(stack[0]);  serial_write("\n");
-    serial_write("   R14 : "); serial_write_hex(stack[1]);  serial_write("\n");
-    serial_write("   R13 : "); serial_write_hex(stack[2]);  serial_write("\n");
-    serial_write("   R12 : "); serial_write_hex(stack[3]);  serial_write("\n");
+    serial_write("   RDI : "); serial_write_hex(stack[0]); serial_write("\n");
+    serial_write("   RSI : "); serial_write_hex(stack[1]); serial_write("\n");
+    serial_write("   RBP : "); serial_write_hex(stack[2]); serial_write("\n");
+    serial_write("   RBX : "); serial_write_hex(stack[3]); serial_write("\n");
 
-    serial_write("   R11 : "); serial_write_hex(stack[4]);  serial_write("\n");
-    serial_write("   R10 : "); serial_write_hex(stack[5]);  serial_write("\n");
-    serial_write("   R9  : "); serial_write_hex(stack[6]);  serial_write("\n");
-    serial_write("   R8  : "); serial_write_hex(stack[7]);  serial_write("\n");
-
-    serial_write("   RBP : "); serial_write_hex(stack[8]);  serial_write("\n");
-    serial_write("   RDI : "); serial_write_hex(stack[9]);  serial_write("\n");
-    serial_write("   RSI : "); serial_write_hex(stack[10]); serial_write("\n");
-    serial_write("   RDX : "); serial_write_hex(stack[11]); serial_write("\n");
-
-    serial_write("   RCX : "); serial_write_hex(stack[12]); serial_write("\n");
-    serial_write("   RBX : "); serial_write_hex(stack[13]); serial_write("\n");
-    serial_write("   RAX : "); serial_write_hex(stack[14]); serial_write("\n");
+    serial_write("   RDX : "); serial_write_hex(stack[4]); serial_write("\n");
+    serial_write("   RCX : "); serial_write_hex(stack[5]); serial_write("\n");
+    serial_write("   RAX : "); serial_write_hex(stack[6]); serial_write("\n");
 
     serial_write("\n");
     serial_write(" +STACK:\n");
@@ -314,7 +295,7 @@ void pf_handler(uint64_t* stack) {
 
     serial_write("\n\n");
     serial_write("      SYSTEM MUST HALT      \n\n");
-    troubleshooting("Page Fault (#PF)");
+    if (cpl == 3) troubleshooting("Page Fault (#PF)"); else panic();
 }
 
 void df_handler(uint64_t* stack) {

@@ -12,6 +12,8 @@ enum {
     SYSCALL_WRITE  = 1,
     SYSCALL_OPEN   = 2,
     SYSCALL_CLOSE  = 3,
-    SYSCALL_SPAWN  = 4,
-    SYSCALL_REBOOT = 5
+    SYSCALL_IOCTL  = 4,
+    SYSCALL_MALLOC = 5,
+    SYSCALL_SPAWN  = 6,
+    SYSCALL_REBOOT = 7
 };

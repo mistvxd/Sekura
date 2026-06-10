@@ -35,6 +35,9 @@ typedef struct {
 
     int alive;
     int started;
+    
+    uint64_t heap_start;
+    uint64_t heap_end;
 } Process;
 
 typedef struct {
