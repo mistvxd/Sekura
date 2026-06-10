@@ -100,7 +100,7 @@ int64_t sys_spawn(void* buf) {
     return 0;
 }
 
-void reboot(void) {
+static void reboot(void) {
     while (inb(0x64) & 0x02);
     outb(0x64, 0xFE);
 

@@ -59,9 +59,7 @@ sekura.iso: iso_root/boot/kernel.elf iso_root/rootfs
 run: all
 	qemu-system-x86_64 \
 		-cdrom sekura.iso \
-		-serial stdio \
-		-device qemu-xhci \
-		-device usb-host,vendorid=0x046d,productid=0xc534
+		-serial stdio
 
 debug: all
 	qemu-system-x86_64 \
