@@ -72,8 +72,13 @@ uint8_t kernel_syscall_stack[4096 * 4];
 
 uint64_t hhdm;
 
+struct limine_framebuffer *glb_fb;
+
 extern void user_entry();
 extern void enable_syscalls();
+
+extern uint8_t keyboard_buffer[64];
+extern size_t kbf_unread;
 
 typedef struct {
     uint64_t width;
@@ -101,6 +106,8 @@ void kernel_main(void) {
     struct limine_module_response *mod_rsp = module_request.response;
 
     struct limine_module_response *userspace_mod;
+
+    glb_fb = fb_rsp;
 
     serial_write("\n<      LIMINE MODULES     >\n");
 

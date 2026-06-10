@@ -36,12 +36,7 @@ Process* scheduler_next(void) {
     return current_process;
 }
 
-void context_switch(
-    InterruptFrame* frame,
-    Process* from,
-    Process* to
-)
-{
+void context_switch(InterruptFrame* frame, Process* from, Process* to) {
     if (from) {
         from->rip = frame->rip;
         from->rsp = frame->rsp;

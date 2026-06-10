@@ -7,6 +7,7 @@
 #include <sekura/arch/x86_64/idt/idt.h>
 #include <sekura/arch/x86_64/events/events.h>
 #include <sekura/syscall/upcall.h>
+#include <sekura/process/process.h>
 #include <stddef.h>
 
 extern uint8_t keyboard_buffer[64];
@@ -14,6 +15,8 @@ extern size_t kbf_unread;
 
 char stdout_buffer[64];
 size_t out_unread;
+
+int reserved_fd_max = 3;
 
 uint64_t* current_syscall_frame;
 
@@ -89,13 +92,20 @@ int64_t sys_read(uint64_t fd, void* buf, uint64_t count) {
     return 0;
 }
 
-int64_t sys_inb(uint16_t port) {
-    return inb(port);
+int64_t sys_spawn(void* buf) {
+    char* ptr = (char*)buf;
+
+    process_create(ptr);
+
+    return 0;
 }
 
-int64_t sys_outb(uint16_t port, uint8_t value) {
-    outb(port, value);
-    return 0;
+void reboot(void) {
+    while (inb(0x64) & 0x02);
+    outb(0x64, 0xFE);
+
+    for (;;)
+        __asm__ volatile("hlt");
 }
 
 uint64_t syscall_dispatch(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6) {
@@ -110,11 +120,11 @@ uint64_t syscall_dispatch(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, ui
         case SYSCALL_READ:
             return sys_read(a1, (void*)a2, a3);
 
-        case SYSCALL_INB:
-            return sys_inb((uint16_t)a1);
+        case SYSCALL_SPAWN:
+            return sys_spawn((void*)a1);
 
-        case SYSCALL_OUTB:
-            return sys_outb((uint16_t)a1, (uint8_t)a2);
+        case SYSCALL_REBOOT:
+            reboot();
 
         default:
             return -1;

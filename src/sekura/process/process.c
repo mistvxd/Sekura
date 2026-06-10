@@ -32,6 +32,15 @@ static Process* process_alloc(void) {
     return 0;
 }
 
+void normalize_path(char* path) {
+    while (*path) {
+        if (*path == '\\')
+            *path = '/';
+
+        path++;
+    }
+}
+
 static struct limine_file* find_module(const char* path) {
     struct limine_module_response* resp = module_request.response;
 
@@ -40,6 +49,13 @@ static struct limine_file* find_module(const char* path) {
 
     for (uint64_t i = 0; i < resp->module_count; i++) {
         struct limine_file* mod = resp->modules[i];
+
+        normalize_path(mod->path);
+
+        serial_write("Trying to create process '");
+        serial_write(mod->path);
+        serial_write("' \n");
+
 
         if (!strcmp(mod->path, path))
             return mod;

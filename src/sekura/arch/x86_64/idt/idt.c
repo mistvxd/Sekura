@@ -15,6 +15,8 @@ extern void halt();
 
 extern void irq0();
 
+extern void troubleshooting(char* error);
+
 static inline void lidt(idtr_t* idtr_ptr) {
     __asm__ volatile("lidt (%0)" : : "r"(idtr_ptr));
 }
@@ -174,6 +176,7 @@ void gpf_handler(uint64_t* stack) {
 
     serial_write("\n\n");
     serial_write("     SYSTEM MUST HALT       \n\n");
+    troubleshooting("General Protection Fault (#GP)");
 }
 
 void pf_handler(uint64_t* stack) {
@@ -311,6 +314,7 @@ void pf_handler(uint64_t* stack) {
 
     serial_write("\n\n");
     serial_write("      SYSTEM MUST HALT      \n\n");
+    troubleshooting("Page Fault (#PF)");
 }
 
 void df_handler(uint64_t* stack) {
