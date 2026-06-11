@@ -52,11 +52,6 @@ static struct limine_file* find_module(const char* path) {
 
         normalize_path(mod->path);
 
-        serial_write("Trying to create process '");
-        serial_write(mod->path);
-        serial_write("' \n");
-
-
         if (!strcmp(mod->path, path))
             return mod;
     }

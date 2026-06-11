@@ -16,6 +16,8 @@
 #include <sekura/kdrivers/disk.h>
 #include <sekura/process/process.h>
 #include <sekura/scheduler/scheduler.h>
+#include <sekura/generated/version.h>
+#include <sekura/filesystem/vfs/vfs.h>
 
 #define USER_FB 0x7000000000
 #define USER_FB_INFO 0x7100000000
@@ -70,6 +72,8 @@ struct limine_framebuffer *glb_fb;
 extern void user_entry();
 extern void enable_syscalls();
 
+extern void panic();
+
 extern uint8_t keyboard_buffer[64];
 extern size_t kbf_unread;
 
@@ -79,7 +83,24 @@ typedef struct {
     uint64_t pitch;
 } FramebufferInfo;
 
+typedef struct {
+    uint64_t address;
+    uint64_t width;
+    uint64_t height;
+    uint64_t pitch;
+} FramebufferFile;
+
 uint64_t kcr3;
+
+void serial_write_padded(const char* text, int width) {
+    serial_write(text);
+
+    int len = strlen(text);
+
+    for(int i = len; i < width; i++) {
+        serial_write(" ");
+    }
+}
 
 void kernel_main(void) {
     serial_write("\n<     LIMINE BOOTSTRAP     >\n");
@@ -133,6 +154,35 @@ void kernel_main(void) {
 
     pmm_prepare_bitmap(hhdm, 0);
 
+    serial_write("\n[    SEKURA KERNEL    ]\n");
+
+    int digits = 1;
+    int n = SEKURA_BUILD;
+
+    while(n >= 10) {
+        n /= 10;
+        digits++;
+    }
+
+    int text_len = 6 + digits;
+    int width = 13;
+
+    int left = (width - text_len) / 2;
+    int right = width - text_len - left;
+
+    serial_write("[     ");
+
+    for(int i = 0; i < left; i++)
+        serial_write(" ");
+
+    serial_write("BUILD ");
+    serial_write_int(SEKURA_BUILD);
+
+    for(int i = 0; i < right; i++)
+        serial_write(" ");
+
+    serial_write("   ]\n");
+    
     serial_write("\n<      SEKURA OUTPUT       >\n");
     /*
     for (int y = 0; y < fb_rsp->height; y++) {
@@ -161,7 +211,9 @@ void kernel_main(void) {
     }
 
     for (uint64_t off = 0; off < fb_size; off += 4096) {
-        vmm_map_page(0x7200000000 + off, fb_phys + off, 0x07, hhdm);
+        uint64_t phys = pmm_alloc_page(0, 0);
+
+        vmm_map_page(0x7200000000 + off, phys, 0x07, hhdm);
     }
 
     uint64_t phys = pmm_alloc_page(0, 0);
@@ -170,6 +222,17 @@ void kernel_main(void) {
     fb_info->width = fb_rsp->width;
     fb_info->height = fb_rsp->height;
     fb_info->pitch = fb_rsp->pitch;
+
+    File* fb_file = create_file("sys/fb0", sizeof(FramebufferFile));
+
+    FramebufferFile fb = {
+        .address = 0x7000000000,
+        .height = fb_rsp->height,
+        .width = fb_rsp->width,
+        .pitch = fb_rsp->pitch
+    };
+
+    memcpy(fb_file->data, &fb, sizeof(FramebufferFile));
 
     vmm_map_page(USER_FB_INFO, phys, 0x07, hhdm);
 

@@ -12,6 +12,7 @@
 #include <limine/limine.h>
 #include <sekura/tools/string.h>
 #include <sekura/scheduler/scheduler.h>
+#include <sekura/filesystem/vfs/vfs.h>
 #include <stddef.h>
 
 extern uint8_t keyboard_buffer[64];
@@ -50,6 +51,7 @@ typedef struct {
     void* object;
     uint32_t type;
     uint32_t flags;
+    uint64_t offset;
 } FileDescriptor;
 
 enum {
@@ -75,6 +77,18 @@ int64_t sys_write(uint64_t fd, const void *buf, uint64_t count) {
             serial_write_char(((char*)ptr)[i]);
         }
         return 0;
+    }
+
+    int index = fd - reserved_fd_count;
+
+    if (index >= 0 && index < 64 && fd_table[index].type == FD_TYPE_FILE) {
+        File* file = (File*)fd_table[index].object;
+
+        uint64_t size = write_file(file->name, (void*)buf, count, fd_table[index].offset);
+
+        if (size > 0) fd_table[index].offset += size;
+
+        return size;
     }
 
     return 0;
@@ -119,6 +133,18 @@ int64_t sys_read(uint64_t fd, void* buf, uint64_t count) {
 
         return size;
     }
+
+    int index = fd - reserved_fd_count;
+
+    if (index >= 0 && index < 64 && fd_table[index].type == FD_TYPE_FILE) {
+        File* file = (File*)fd_table[index].object;
+        uint64_t size = read_file(file->name, buf, count, fd_table[index].offset);
+
+        if (size > 0) fd_table[index].offset += size;
+        
+        return size;
+    }
+
     return 0;
 }
 
@@ -147,24 +173,41 @@ int fd_next(void) {
     return -1;
 }
 
-int64_t sys_open(char* file) {
+int64_t sys_open(char* file, int flags) {
     if (strcmp(file, "/dev/fb0") == 0) {
-        FileDescriptor fd;
-
-        glb_fb_info.address = 0x7000000000;
-        glb_fb_info.width   = glb_fb->width;
-        glb_fb_info.height  = glb_fb->height;
-        glb_fb_info.pitch   = glb_fb->pitch;
-
-        fd.object = &glb_fb_info;
-        fd.type = FD_TYPE_DEVICE;
-
-        int fd_num = fd_next();
-        fd_table[fd_num] = fd;
-
-        return (fd_num + reserved_fd_count);
+        return 0;
     }
-    return -1;
+
+    File* f = get_file(file);
+
+    if (!f && (flags & O_CREAT))
+        f = create_file(file, PAGE_SIZE);
+
+    if (!f)
+        return -1;
+
+    int fd_num = fd_next();
+
+    if (fd_num < 0)
+        return -1;
+
+    fd_table[fd_num].object = f;
+    fd_table[fd_num].type = FD_TYPE_FILE;
+    fd_table[fd_num].flags = flags;
+    fd_table[fd_num].offset = 0;
+
+    return fd_num + reserved_fd_count;
+}
+
+int64_t sys_close(int fd) {
+    int index = fd - reserved_fd_count;
+
+    if (index < 0 || index >= 64)
+        return -1;
+
+    memset(&fd_table[index], 0, sizeof(FileDescriptor));
+
+    return 0;
 }
 
 int64_t sys_ioctl(int fd, int action, void* arg) {
@@ -196,6 +239,37 @@ void* sys_malloc(size_t size) {
     return (void*)virt;
 }
 
+int64_t sys_free(uint64_t virt) {
+    uint64_t phys = vmm_virt_to_phys(virt, hhdm);
+
+    pmm_free_page(phys);
+
+    vmm_unmap_page(virt, hhdm);
+
+    memset((void*)phys, 0, PAGE_SIZE);
+
+    return 0;
+}
+
+int64_t sys_seek(int fd, uint64_t offset) {
+    int index = fd - reserved_fd_count;
+
+    if (index < 0 || index >= 64)
+        return -1;
+
+    fd_table[index].offset = offset;
+
+    return 0;
+}
+
+int sys_readdir(int index, char* buffer) {
+    if (index >= file_count) return -1;
+
+    memcpy(buffer, files[index].name, strlen(files[index].name));
+
+    return 0;
+}
+
 uint64_t syscall_dispatch(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6) {
     // handlers interface
     
@@ -215,13 +289,25 @@ uint64_t syscall_dispatch(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, ui
             reboot();
 
         case SYSCALL_OPEN:
-            return sys_open((char*)a1);
+            return sys_open((char*)a1, (int)a2);
+
+        case SYSCALL_CLOSE:
+            return sys_close((int)a1);
 
         case SYSCALL_IOCTL:
             return sys_ioctl((int)a1, (int)a2, (void*)a3);
 
         case SYSCALL_MALLOC:
             return (uint64_t)sys_malloc((size_t)a1);
+
+        case SYSCALL_FREE:
+            return (uint64_t)sys_free(a1);
+
+        case SYSCALL_SEEK:
+            return (uint64_t)sys_seek((int)a1, a2);
+
+        case SYSCALL_READDIR:
+            return (uint64_t)sys_readdir((int)a1, (char*)a2);
 
         default:
             return -1;

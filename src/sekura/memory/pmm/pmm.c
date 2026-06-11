@@ -4,9 +4,6 @@
 #include <sekura/serial/serial.h>
 #include <limine/limine.h>
 
-#define PAGE_SIZE 4096
-#define MAX_ENTRY 512
-
 #define PMM_VERBOSE_LOG(verbose, msg) \
     do { if (verbose) serial_write(msg); } while (0)
 
@@ -83,6 +80,9 @@ int pmm_prepare_bitmap(uint64_t hhdm, int verbose) {
 
     uint64_t bitmap_pages = (bitmap_size + PAGE_SIZE - 1) / PAGE_SIZE;
 
+    serial_write_int(bitmap_pages);
+    serial_write(" pages available\n");
+
     for (uint64_t p = 0; p < bitmap_pages; p++) {
         uint64_t addr = bitmap_entry->base + (p * PAGE_SIZE);
 
@@ -143,11 +143,12 @@ uint64_t pmm_alloc_page(uint64_t offset, int verbose) {
     return addr + offset;
 }
 
-int pmm_free_page(int page, int verbose) {
-    int byte = page / 8;
-    int bit = page % 8;
+void pmm_free_page(uint64_t phys) {
+    uint64_t page = phys / PAGE_SIZE;
+
+    uint64_t byte = page / 8;
+
+    uint64_t bit = page % 8;
 
     bitmap[byte] &= ~(1 << bit);
-
-    return 0;
 }

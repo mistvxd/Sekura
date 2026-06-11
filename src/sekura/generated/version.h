@@ -1,0 +1,2 @@
+#define SEKURA_BUILD 62
+#define SEKURA_COMMIT ""

@@ -19,7 +19,9 @@ KERNEL_OBJ_ASM = $(patsubst src/%.asm, build/%.o, $(KERNEL_SRC_ASM))
 
 KERNEL_OBJS = $(KERNEL_OBJ_C) $(KERNEL_OBJ_ASM)
 
-.PHONY: all run debug clean
+BUILD_FILE := .build_number
+
+.PHONY: all run debug clean version_header
 
 all: sekura.iso
 
@@ -31,7 +33,16 @@ build/%.o: src/%.asm
 	mkdir -p $(dir $@)
 	$(AS) $(ASFLAGS) $< -o $@
 
-iso_root/boot/kernel.elf: $(KERNEL_OBJS)
+version_header:
+	@touch $(BUILD_FILE)
+	@BUILD=$$(cat $(BUILD_FILE)); \
+	BUILD=$$((BUILD + 1)); \
+	echo $$BUILD > $(BUILD_FILE); \
+	mkdir -p src/sekura/generated; \
+	echo "#define SEKURA_BUILD $$BUILD" > src/sekura/generated/version.h; \
+	echo "#define SEKURA_COMMIT \"$(COMMIT)\"" >> src/sekura/generated/version.h
+
+iso_root/boot/kernel.elf: version_header $(KERNEL_OBJS)
 	mkdir -p iso_root/boot
 	$(LD) -T linker.ld $(KERNEL_OBJS) -o iso_root/boot/kernel.elf
 
@@ -60,6 +71,13 @@ run: all
 	qemu-system-x86_64 \
 		-cdrom sekura.iso \
 		-serial stdio
+
+kvm: all
+	qemu-system-x86_64 \
+		-cdrom sekura.iso \
+		-serial stdio \
+		-accel kvm \
+		-cpu host
 
 debug: all
 	qemu-system-x86_64 \

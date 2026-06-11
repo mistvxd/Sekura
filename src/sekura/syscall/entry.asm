@@ -8,13 +8,9 @@ syscall_entry:
 
     lea rsp, [rel kernel_syscall_stack + 4096]
 
-    extern current_syscall_frame
-
     push r12
     push rcx
     push r11
-
-    mov [rel current_syscall_frame], rsp
 
     call syscall_dispatch
 
