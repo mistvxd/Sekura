@@ -5,6 +5,9 @@
 #include <sekura/process/process.h>
 #include <sekura/scheduler/scheduler.h>
 #include <sekura/serial/serial.h>
+#include <sekura/memory/pmm/pmm.h>
+
+#define PIT_BASE_FREQUENCY 1193182
 
 uint8_t keyboard_buffer[64];
 size_t kbf_unread;
@@ -34,12 +37,31 @@ void keyboard_handler(uint64_t* stack) {
     pic_eoi(1);
 }
 
-static int counter;
+uint64_t ticks;
+
+extern void show_meminfo(void);
+
+extern int inside_syscall;
 
 void timer_handler(InterruptFrame* frame) {
+    ticks++;
+
+    if (ticks % 500 == 0) {
+        show_meminfo();
+    }
+
     pic_eoi(0);
 
     scheduler_tick(frame);
+}
+
+void pit_init(uint32_t frequency) {
+    uint16_t divisor = PIT_BASE_FREQUENCY / frequency;
+
+    outb(0x43, 0x36);
+
+    outb(0x40, divisor & 0xFF);
+    outb(0x40, (divisor >> 8) & 0xFF);
 }
 
 __attribute__((naked))

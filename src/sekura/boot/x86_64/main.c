@@ -102,6 +102,36 @@ void serial_write_padded(const char* text, int width) {
     }
 }
 
+void show_meminfo(void) {
+    serial_write("[ SEKURA MEMORY REPORT ]\n");
+    serial_write("  Current Memory Use: ");
+    uint64_t memory_use = pmm_used_pages() * 4096;
+
+    if (memory_use < 1024) {
+        serial_write_int(memory_use);
+        serial_write(" B");
+    }
+    else if (memory_use >= 1024 && memory_use < 1024 * 1024) {
+        serial_write_int(memory_use / 1024);
+        serial_write(" KB (");
+        serial_write_int(memory_use);
+        serial_write(" B");
+        serial_write(")");
+    }
+    if (memory_use >= 1024 * 1024) {
+        serial_write_int(memory_use / 1024 / 1024);
+        serial_write(" MB (");
+        serial_write_int(memory_use / 1024);
+        serial_write(" KB");
+        serial_write(")");
+    }
+
+    serial_write(" / ");
+
+    serial_write_int(pmm_total_memory() / 1024 / 1024);
+    serial_write(" MB\n");
+}
+
 void kernel_main(void) {
     serial_write("\n<     LIMINE BOOTSTRAP     >\n");
     serial_write("\n[LIMINE REQUESTS SANITY CHECK]\n");
@@ -182,8 +212,12 @@ void kernel_main(void) {
         serial_write(" ");
 
     serial_write("   ]\n");
+
+    serial_write("\nBootstrap Memory Use: ");
+    serial_write_int((pmm_used_pages() * 4096) / 1024);
+    serial_write(" KB\n");
     
-    serial_write("\n<      SEKURA OUTPUT       >\n");
+    serial_write("\n<      SEKURA OUTPUT       >\n\n");
     /*
     for (int y = 0; y < fb_rsp->height; y++) {
         for (int x = 0; x < fb_rsp->width; x++) {
@@ -200,6 +234,8 @@ void kernel_main(void) {
 
     Process* init = process_create("/rootfs/sysinit/init.elf");
 
+    show_meminfo();
+
     vmm_set_cr3(init->cr3);
 
     uint64_t fb_phys = (uint64_t)fb_rsp->address - hhdm;
@@ -208,12 +244,6 @@ void kernel_main(void) {
 
     for (uint64_t off = 0; off < fb_size; off += 4096) {
         vmm_map_page(USER_FB + off, fb_phys + off, 0x07, hhdm);
-    }
-
-    for (uint64_t off = 0; off < fb_size; off += 4096) {
-        uint64_t phys = pmm_alloc_page(0, 0);
-
-        vmm_map_page(0x7200000000 + off, phys, 0x07, hhdm);
     }
 
     uint64_t phys = pmm_alloc_page(0, 0);
@@ -237,6 +267,8 @@ void kernel_main(void) {
     vmm_map_page(USER_FB_INFO, phys, 0x07, hhdm);
 
     vmm_set_cr3(kcr3);
+
+    show_meminfo();
 
     scheduler_start();
 }

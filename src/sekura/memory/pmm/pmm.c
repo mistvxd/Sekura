@@ -16,6 +16,8 @@ uint64_t total_memory;
 uint8_t* bitmap;
 uint64_t bitmap_size;
 
+uint64_t initial_bitmap_size;
+
 uint64_t highest_addr = 0;
 
 void pmm_push_memmap(struct limine_memmap_response* mmap_rp) {
@@ -28,8 +30,11 @@ int pmm_initialize(int verbose) {
         struct limine_memmap_entry* entry = memmap->entries[i];
         uint64_t end = entry->base + entry->length;
 
-        if (end > highest_addr)
-            highest_addr = end;
+        if (entry->type == LIMINE_MEMMAP_USABLE) {
+            uint64_t end = entry->base + entry->length;
+
+            if (end > highest_addr) highest_addr = end;
+        }
         
         PMM_VERBOSE_LOG(verbose, "\n[PMM]: Entry FOUND. || ");
         if (entry->type == LIMINE_MEMMAP_USABLE) PMM_VERBOSE_LOG(verbose, "[PMM]: Entry USABLE.");
@@ -80,8 +85,17 @@ int pmm_prepare_bitmap(uint64_t hhdm, int verbose) {
 
     uint64_t bitmap_pages = (bitmap_size + PAGE_SIZE - 1) / PAGE_SIZE;
 
-    serial_write_int(bitmap_pages);
-    serial_write(" pages available\n");
+    initial_bitmap_size = bitmap_size;
+
+    serial_write("\n[  SEKURA MEMORY INFO  ]\n");
+
+    serial_write("  Usable Memory : ");
+    serial_write_int(total_memory / 1024 / 1024);
+    serial_write(" MB\n");
+
+    serial_write("  Bitmap Size   : ");
+    serial_write_int(bitmap_size / 1024);
+    serial_write(" KB\n");
 
     for (uint64_t p = 0; p < bitmap_pages; p++) {
         uint64_t addr = bitmap_entry->base + (p * PAGE_SIZE);
@@ -151,4 +165,23 @@ void pmm_free_page(uint64_t phys) {
     uint64_t bit = page % 8;
 
     bitmap[byte] &= ~(1 << bit);
+}
+
+uint64_t pmm_used_pages(void) {
+    uint64_t used = 0;
+
+    for (uint64_t byte = 0; byte < bitmap_size; byte++) {
+        uint8_t b = bitmap[byte];
+
+        for (int bit = 0; bit < 8; bit++) {
+            if (b & (1 << bit))
+                used++;
+        }
+    }
+
+    return used;
+}
+
+uint64_t pmm_total_memory(void) {
+    return total_memory;
 }

@@ -450,6 +450,8 @@ static inline uint8_t inb(uint16_t port) {
 void idt_init() {
     cli();
 
+    pit_init(100);
+
     for (int i = 0; i < 31; i++) {
         idt_set_gate(i, isr_common, 0x8E);
     }

@@ -11,3 +11,5 @@ int pmm_prepare_bitmap(uint64_t hhdm, int verbose);
 int pmm_alloc_page_index(int page, int verbose);
 uint64_t pmm_alloc_page(uint64_t offset, int verbose);
 void pmm_free_page(uint64_t phys);
+uint64_t pmm_used_pages(void);
+uint64_t pmm_total_memory(void);

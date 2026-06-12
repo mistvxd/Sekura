@@ -25,5 +25,6 @@ enum {
     SYSCALL_SPAWN   = 7,
     SYSCALL_SEEK    = 8,
     SYSCALL_READDIR = 9,
-    SYSCALL_REBOOT  = 10
+    SYSCALL_REBOOT  = 10,
+    SYSCALL_SLEEP   = 11,
 };

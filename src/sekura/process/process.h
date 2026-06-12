@@ -35,6 +35,9 @@ typedef struct {
 
     int alive;
     int started;
+
+    int sleeping;
+    uint64_t wakeup_ticks;
     
     uint64_t heap_start;
     uint64_t heap_end;

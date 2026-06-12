@@ -29,6 +29,8 @@ uint64_t* current_syscall_frame;
 
 extern uint64_t hhdm;
 
+extern uint64_t ticks;
+
 static inline void outb(uint16_t port, uint8_t val) {
     asm volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
 }
@@ -60,6 +62,8 @@ enum {
 };
 
 FileDescriptor fd_table[64];
+
+int inside_syscall = 0;
 
 int64_t sys_write(uint64_t fd, const void *buf, uint64_t count) {
     uint64_t ptr = (uint64_t)buf;
@@ -174,7 +178,12 @@ int fd_next(void) {
 }
 
 int64_t sys_open(char* file, int flags) {
-    if (strcmp(file, "/dev/fb0") == 0) {
+    if (strcmp(file, "sys/meminfo") == 0) {
+        int fd_num = fd_next();
+
+        if (fd_num < 0)
+            return -1;
+        
         return 0;
     }
 
@@ -223,20 +232,43 @@ int64_t sys_ioctl(int fd, int action, void* arg) {
 }
 
 void* sys_malloc(size_t size) {
-    uint64_t pages = (size + 4095) / 4096;
+    if (size == 0)
+        return NULL;
 
-    uint64_t virt = scheduler_current()->heap_end;
+    uint64_t pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
+
+    Process* current = scheduler_current();
+    uint64_t virt = current->heap_end;
 
     for (uint64_t i = 0; i < pages; i++) {
-
         uint64_t phys = pmm_alloc_page(0, 0);
 
-        vmm_map_page(virt + i * 4096, phys, 0x07, hhdm);
+        if (!phys) {
+            for (uint64_t j = 0; j < i; j++) {
+                uint64_t page_virt = virt + j * PAGE_SIZE;
+                uint64_t page_phys = vmm_virt_to_phys(page_virt, hhdm);
+
+                vmm_unmap_page(page_virt, hhdm);
+                pmm_free_page(page_phys);
+            }
+
+            serial_write("[ SEKURA MEMORY REPORT ]\n");
+            serial_write("  Memory allocation FAILED.\n");
+            serial_write("  OOM: Out of physical memory.\n");
+
+            return NULL;
+        }
+
+        vmm_map_page(virt + i * PAGE_SIZE, phys, 0x07, hhdm);
     }
 
-    scheduler_current()->heap_end += pages * 4096;
+    current->heap_end += pages * PAGE_SIZE;
 
     return (void*)virt;
+}
+
+void* sys_sbrk(intptr_t increment) {
+    //
 }
 
 int64_t sys_free(uint64_t virt) {
@@ -246,7 +278,11 @@ int64_t sys_free(uint64_t virt) {
 
     vmm_unmap_page(virt, hhdm);
 
-    memset((void*)phys, 0, PAGE_SIZE);
+    memset((void*)(phys + hhdm), 0, PAGE_SIZE);
+
+    Process* current = scheduler_current();
+
+    current->heap_end -= 4096;
 
     return 0;
 }
@@ -267,6 +303,10 @@ int sys_readdir(int index, char* buffer) {
 
     memcpy(buffer, files[index].name, strlen(files[index].name));
 
+    return 0;
+}
+
+int64_t sys_sleep(int ms) {
     return 0;
 }
 
@@ -308,6 +348,9 @@ uint64_t syscall_dispatch(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, ui
 
         case SYSCALL_READDIR:
             return (uint64_t)sys_readdir((int)a1, (char*)a2);
+
+        case SYSCALL_SLEEP:
+            return (uint64_t)sys_sleep((int)a1);
 
         default:
             return -1;
