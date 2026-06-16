@@ -301,7 +301,7 @@ int64_t sys_seek(int fd, uint64_t offset) {
 int sys_readdir(int index, char* buffer) {
     if (index >= file_count) return -1;
 
-    memcpy(buffer, files[index].name, strlen(files[index].name));
+    memcpy(buffer, files[index].name, strlen(files[index].name) + 1);
 
     return 0;
 }

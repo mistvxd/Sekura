@@ -3,11 +3,18 @@
 #include <sekura/process/process.h>
 #include <sekura/memory/vmm/vmm.h>
 #include <sekura/serial/serial.h>
+#include <sekura/recovery/recovery.h>
+
+#include <sekura/logs/log.h>
+
+extern void panic(void);
 
 extern uint64_t hhdm;
 
 extern void enter_userspace(uint64_t rip, uint64_t rsp);
 extern void halt(void);
+
+extern volatile int recovery_requested;
 
 extern Process processes[MAX_PROCESSES];
 
@@ -15,12 +22,25 @@ Process* current_process;
 
 int scheduler_started;
 
-int troubleshooting_requested;
+int scheduler_paused;
 
 void scheduler_start(void) {
+    kdebug_log("SCHED", "Starting scheduler.");
+
+    if (!processes[0].alive) {
+        kerror_log("SCHED", "Init process unavailable.");
+        panic();
+    }
+
     current_process = &processes[0];
+
     scheduler_started = 1;
+
+    kdebug_log("SCHED", "Analysing scheduler.");
+
     process_run(current_process);
+
+    kinfo_log("SCHED", "Scheduler started.");
 }
 
 Process* scheduler_next(void) {
@@ -93,7 +113,8 @@ void context_switch(InterruptFrame* frame, Process* from, Process* to) {
 }
 
 void scheduler_tick(InterruptFrame* frame) {
-    if (!scheduler_started) return;
+    if (recovery_requested) {recovery_keybind(); recovery_requested = 0;}
+    if (!scheduler_started || scheduler_paused) return;
     Process* next = scheduler_next();
     if (next->started) {
         context_switch(frame, current_process, next);

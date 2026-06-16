@@ -5,4 +5,4 @@ void scheduler_start(void);
 void scheduler_tick(InterruptFrame* frame);
 Process* scheduler_current(void);
 
-extern int troubleshooting_requested;
+extern int scheduler_paused;

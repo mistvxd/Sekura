@@ -6,6 +6,10 @@
 #include <sekura/tools/memset.h>
 #include <sekura/serial/serial.h>
 
+#include <sekura/logs/log.h>
+
+extern void panic(void);
+
 static void map_segment_pages(
     uint64_t virt,
     uint64_t size,
@@ -40,11 +44,17 @@ int elf_load(
     uint64_t hhdm,
     uint64_t* entry
 ) {
+    kinfo_log("ELF", "Loading executable.");
+
     Elf64_Ehdr* ehdr =
         (Elf64_Ehdr*)file;
 
-    if (ehdr->magic != ELF_MAGIC)
+    if (ehdr->magic != ELF_MAGIC) {
+        kerror_log("ELF", "Invalid ELF magic.");
         return 0;
+    }
+
+    kdebug_log("ELF", "ELF header validated.");
 
     Elf64_Phdr* phdrs =
         (Elf64_Phdr*)(
@@ -61,6 +71,8 @@ int elf_load(
 
         if (ph->type != PT_LOAD)
             continue;
+
+        kdebug_log("ELF", "Mapping PT_LOAD segment.");
 
         map_segment_pages(
             ph->vaddr,
@@ -84,6 +96,8 @@ int elf_load(
     }
 
     *entry = ehdr->entry;
+
+    kinfo_log("ELF", "Executable loaded successfully.");
 
     return 1;
 }

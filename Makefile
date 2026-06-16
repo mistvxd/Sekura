@@ -85,7 +85,17 @@ debug: all
 		-serial stdio \
 		-d int,cpu_reset \
 		-no-reboot \
+		-no-shutdown
+
+dekvm: all
+	qemu-system-x86_64 \
+		-cdrom sekura.iso \
+		-serial stdio \
+		-d int,cpu_reset \
+		-no-reboot \
 		-no-shutdown \
+		-accel kvm \
+		-cpu host
 
 clean:
 	rm -rf build

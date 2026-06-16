@@ -10,6 +10,10 @@
 #include <sekura/tools/string.h>
 #include <sekura/tools/memset.h>
 
+#include <sekura/logs/log.h>
+
+extern void panic(void);
+
 File files[MAX_FILES];
 
 uint64_t file_count;

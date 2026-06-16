@@ -1,6 +1,11 @@
 #include <stdint.h>
 #include <stddef.h>
+#include <stdarg.h>
 #include <sekura/serial/serial.h>
+
+#include <sekura/logs/log.h>
+
+extern void panic(void);
 
 static inline uint8_t inb(uint16_t port) {
     uint8_t value;
@@ -70,4 +75,57 @@ void serial_write_int(uint64_t value) {
     }
 
     serial_write(&buffer[i]);
+}
+
+void serial_writef(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+
+    while (*fmt) {
+        if (*fmt != '%') {
+            serial_write_char(*fmt++);
+            continue;
+        }
+
+        fmt++;
+
+        switch (*fmt) {
+            case 'd':
+            case 'u':
+                serial_write_int(va_arg(args, uint64_t));
+                break;
+
+            case 'x':
+                serial_write_hex(va_arg(args, uint64_t));
+                break;
+
+            case 's': {
+                const char* str = va_arg(args, const char*);
+
+                if (str)
+                    serial_write(str);
+                else
+                    serial_write("(null)");
+
+                break;
+            }
+
+            case 'c':
+                serial_write_char((char)va_arg(args, int));
+                break;
+
+            case '%':
+                serial_write_char('%');
+                break;
+
+            default:
+                serial_write_char('%');
+                serial_write_char(*fmt);
+                break;
+        }
+
+        fmt++;
+    }
+
+    va_end(args);
 }

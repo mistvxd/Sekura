@@ -18,6 +18,11 @@
 #include <sekura/scheduler/scheduler.h>
 #include <sekura/generated/version.h>
 #include <sekura/filesystem/vfs/vfs.h>
+#include <sekura/logs/log.h>
+#include <sekura/generated/version2.h>
+#include <sekura/tools/itoa.h>
+#include <sekura/tools/strcat.h>
+#include <sekura/tools/string.h>
 
 #define USER_FB 0x7000000000
 #define USER_FB_INFO 0x7100000000
@@ -77,6 +82,8 @@ extern void panic();
 extern uint8_t keyboard_buffer[64];
 extern size_t kbf_unread;
 
+extern void ps2_config(void);
+
 typedef struct {
     uint64_t width;
     uint64_t height;
@@ -133,35 +140,49 @@ void show_meminfo(void) {
 }
 
 void kernel_main(void) {
-    serial_write("\n<     LIMINE BOOTSTRAP     >\n");
-    serial_write("\n[LIMINE REQUESTS SANITY CHECK]\n");
-    serial_write("  [ Framebuffer : ");
-    if (framebuffer_request.response) serial_write("PASS  ]\n"); else { serial_write("ERROR ] Halting...\n"); halt(); }  
-    serial_write("  [ Memory Map  : ");
-    if (memmap_request.response) serial_write("PASS  ]\n"); else { serial_write("ERROR ] Halting...\n"); halt(); }  
-    serial_write("  [ Higher Half : ");
-    if (hhdm_request.response) serial_write("PASS  ]\n"); else { serial_write("ERROR ] Halting...\n"); halt(); }  
+    serial_initialize();
 
-    // requests
+    kinfo_log("BOOT", "Sekura bootstrap started.");
+
+    if (!framebuffer_request.response) {
+        kerror_log("LIMINE", "Framebuffer request unavailable.");
+        halt();
+    }
+
+    if (!memmap_request.response) {
+        kerror_log("LIMINE", "Memory map unavailable.");
+        halt();
+    }
+
+    if (!hhdm_request.response) {
+        kerror_log("LIMINE", "HHDM unavailable.");
+        halt();
+    }
+
+    if (!module_request.response) {
+        kerror_log("LIMINE", "Module response unavailable.");
+        halt();
+    }
+
+    kinfo_log("LIMINE", "Bootloader requests validated.");
+
     struct limine_framebuffer *fb_rsp = framebuffer_request.response->framebuffers[0];
     struct limine_memmap_response *memmap_rsp = memmap_request.response;
     struct limine_hhdm_response *hhdm_rsp = hhdm_request.response;
-
     struct limine_module_response *mod_rsp = module_request.response;
 
-    struct limine_module_response *userspace_mod;
+    if (!fb_rsp) {
+        kerror_log("LIMINE", "Framebuffer unavailable.");
+        halt();
+    }
+
+    if (!mod_rsp->module_count) {
+        kwarn_log("LIMINE", "No boot modules detected.");
+    } else {
+        kinfo_log("LIMINE", "Boot modules loaded.");
+    }
 
     glb_fb = fb_rsp;
-
-    serial_write("\n<      LIMINE MODULES     >\n");
-
-    for (uint64_t i = 0; i < mod_rsp->module_count; i++) {
-
-        struct limine_file* mod = mod_rsp->modules[i];
-
-        serial_write(mod->path);
-        serial_write("\n");
-    }
 
     hhdm = hhdm_rsp->offset;
 
@@ -169,77 +190,54 @@ void kernel_main(void) {
 
     kcr3 = vmm_get_cr3();
 
-    serial_initialize();
-
     ata_disk_init();
+
+    tss_initialize(kernel_stack_top);
+
+    gdt_initialize();
+
+    idt_init();
 
     enable_syscalls();
 
-    tss_initialize(kernel_stack_top);
-    gdt_initialize();
-    idt_init();
-
     pmm_push_memmap(memmap_rsp);
+
     pmm_initialize(0);
 
     pmm_prepare_bitmap(hhdm, 0);
 
-    serial_write("\n[    SEKURA KERNEL    ]\n");
+    ps2_config();
 
-    int digits = 1;
-    int n = SEKURA_BUILD;
+    kinfo_log("BOOT", "Architecture initialized.");
 
-    while(n >= 10) {
-        n /= 10;
-        digits++;
-    }
+    char kernel_name[128];
+    char build[32];
 
-    int text_len = 6 + digits;
-    int width = 13;
+    memcpy(kernel_name, "Sekura Kernel v", strlen("Sekura Kernel v"));
 
-    int left = (width - text_len) / 2;
-    int right = width - text_len - left;
+    strcat(kernel_name, SEKURA_VERSION);
+    strcat(kernel_name, " \"");
+    strcat(kernel_name, SEKURA_CODENAME);
+    strcat(kernel_name, "\" Build ");
 
-    serial_write("[     ");
+    uitoa(SEKURA_BUILD, build, 10);
 
-    for(int i = 0; i < left; i++)
-        serial_write(" ");
+    strcat(kernel_name, build);
 
-    serial_write("BUILD ");
-    serial_write_int(SEKURA_BUILD);
-
-    for(int i = 0; i < right; i++)
-        serial_write(" ");
-
-    serial_write("   ]\n");
-
-    serial_write("\nBootstrap Memory Use: ");
-    serial_write_int((pmm_used_pages() * 4096) / 1024);
-    serial_write(" KB\n");
-    
-    serial_write("\n<      SEKURA OUTPUT       >\n\n");
-    /*
-    for (int y = 0; y < fb_rsp->height; y++) {
-        for (int x = 0; x < fb_rsp->width; x++) {
-
-            uint8_t r = (x * 255) / fb_rsp->width;
-            uint8_t g = (y * 255) / fb_rsp->height;
-            uint8_t b = ((x + y) * 255) / (fb_rsp->width + fb_rsp->height);
-
-            ((uint32_t*)fb_rsp->address)[y * fb_rsp->pitch / 4 + x] =
-                (r << 16) | (g << 8) | b;
-        }
-    }
-    */
+    kinfo_log("KERNEL", kernel_name);
 
     Process* init = process_create("/rootfs/sysinit/init.elf");
 
-    show_meminfo();
+    if (!init) {
+        kerror_log("INIT", "Failed to create init process.");
+        panic();
+    }
+
+    kinfo_log("INIT", "Init process created.");
 
     vmm_set_cr3(init->cr3);
 
     uint64_t fb_phys = (uint64_t)fb_rsp->address - hhdm;
-
     uint64_t fb_size = fb_rsp->pitch * fb_rsp->height;
 
     for (uint64_t off = 0; off < fb_size; off += 4096) {
@@ -248,15 +246,26 @@ void kernel_main(void) {
 
     uint64_t phys = pmm_alloc_page(0, 0);
 
+    if (!phys) {
+        kerror_log("USERSPACE", "Failed to allocate framebuffer info page.");
+        panic();
+    }
+
     FramebufferInfo* fb_info = (FramebufferInfo*)(phys + hhdm);
+
     fb_info->width = fb_rsp->width;
     fb_info->height = fb_rsp->height;
     fb_info->pitch = fb_rsp->pitch;
 
     File* fb_file = create_file("sys/fb0", sizeof(FramebufferFile));
 
+    if (!fb_file) {
+        kerror_log("USERSPACE", "Failed to create framebuffer file.");
+        panic();
+    }
+
     FramebufferFile fb = {
-        .address = 0x7000000000,
+        .address = USER_FB,
         .height = fb_rsp->height,
         .width = fb_rsp->width,
         .pitch = fb_rsp->pitch
@@ -268,7 +277,7 @@ void kernel_main(void) {
 
     vmm_set_cr3(kcr3);
 
-    show_meminfo();
+    kinfo_log("USERSPACE", "Userspace environment initialized.");
 
     scheduler_start();
 }

@@ -4,6 +4,10 @@
 #include <sekura/serial/serial.h>
 #include <limine/limine.h>
 
+#include <sekura/logs/log.h>
+
+extern void panic(void);
+
 #define PMM_VERBOSE_LOG(verbose, msg) \
     do { if (verbose) serial_write(msg); } while (0)
 
@@ -25,40 +29,63 @@ void pmm_push_memmap(struct limine_memmap_response* mmap_rp) {
 }
 
 int pmm_initialize(int verbose) {
-    PMM_VERBOSE_LOG(verbose, "[PMM]: Initializing...\n");
+    kdebug_log("PMM", "Parsing bootloader memory map.");
+
+    if (!memmap) {
+        kerror_log("PMM", "Memory map unavailable.");
+        panic();
+    }
+
     for (size_t i = 0; i < memmap->entry_count; i++) {
         struct limine_memmap_entry* entry = memmap->entries[i];
-        uint64_t end = entry->base + entry->length;
 
         if (entry->type == LIMINE_MEMMAP_USABLE) {
             uint64_t end = entry->base + entry->length;
 
-            if (end > highest_addr) highest_addr = end;
+            if (end > highest_addr)
+                highest_addr = end;
         }
-        
-        PMM_VERBOSE_LOG(verbose, "\n[PMM]: Entry FOUND. || ");
-        if (entry->type == LIMINE_MEMMAP_USABLE) PMM_VERBOSE_LOG(verbose, "[PMM]: Entry USABLE.");
-        else
-            PMM_VERBOSE_LOG(verbose, "[PMM]: Entry NOT USABLE.");
 
-        if (entry->type == LIMINE_MEMMAP_USABLE && usable_count < MAX_ENTRY) { entry_map[usable_count] = entry; usable_count++; total_memory += entry->length; }
+        if (entry->type == LIMINE_MEMMAP_USABLE && usable_count < MAX_ENTRY) {
+            entry_map[usable_count] = entry;
+            usable_count++;
+            total_memory += entry->length;
+        }
     }
-    PMM_VERBOSE_LOG(verbose, "\n[PMM]: Entry Map Ready.\n");
 
-    if (memmap->entry_count) return 0; else return 1;
+    if (!usable_count) {
+        kerror_log("PMM", "No usable memory regions found.");
+        panic();
+    }
+
+    if (!highest_addr) {
+        kerror_log("PMM", "Invalid physical address space.");
+        panic();
+    }
+
+    kinfo_log("PMM", "Boot memory map initialized.");
+
+    return 0;
 }
 
 int pmm_prepare_bitmap(uint64_t hhdm, int verbose) {
+    kdebug_log("PMM", "Preparing allocation bitmap.");
+
     uint64_t total_pages = highest_addr / PAGE_SIZE;
     bitmap_size = (total_pages + 7) / 8;
 
-    struct limine_memmap_entry* bitmap_entry;
+    struct limine_memmap_entry* bitmap_entry = NULL;
 
     for (size_t i = 0; i < usable_count; i++) {
         if (entry_map[i]->length >= bitmap_size) {
             bitmap_entry = entry_map[i];
             break;
         }
+    }
+
+    if (!bitmap_entry) {
+        kerror_log("PMM", "Unable to reserve bitmap memory.");
+        panic();
     }
 
     bitmap = (uint8_t*)(bitmap_entry->base + hhdm);
@@ -87,16 +114,6 @@ int pmm_prepare_bitmap(uint64_t hhdm, int verbose) {
 
     initial_bitmap_size = bitmap_size;
 
-    serial_write("\n[  SEKURA MEMORY INFO  ]\n");
-
-    serial_write("  Usable Memory : ");
-    serial_write_int(total_memory / 1024 / 1024);
-    serial_write(" MB\n");
-
-    serial_write("  Bitmap Size   : ");
-    serial_write_int(bitmap_size / 1024);
-    serial_write(" KB\n");
-
     for (uint64_t p = 0; p < bitmap_pages; p++) {
         uint64_t addr = bitmap_entry->base + (p * PAGE_SIZE);
 
@@ -105,7 +122,9 @@ int pmm_prepare_bitmap(uint64_t hhdm, int verbose) {
         bitmap[index / 8] |= (1 << (index % 8));
     }
 
-    if (total_pages) return 0; else return 1;
+    kinfo_log("PMM", "Physical Memory Manager initialized.");
+
+    return 0;
 }
 
 int pmm_alloc_page_index(int page, int verbose) {
