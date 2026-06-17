@@ -71,11 +71,11 @@ static uint64_t process_create_stack(void) {
     uint64_t base = next_stack;
 
     for (int i = 0; i < 4; i++) {
-        uint64_t page = pmm_alloc_page(0, 0);
+        uint64_t page = pmm_alloc_page(0);
 
         if (!page) {
             kerror_log("PROCESS", "Failed to allocate stack page.");
-            halt();
+            panic();
         }
 
         vmm_map_page(base + i * 0x1000, page, 0x07, hhdm);
@@ -95,11 +95,11 @@ static uint64_t process_create_cr3(void) {
 
     __asm__ volatile ("mov %%cr3, %0" : "=r"(old_cr3));
 
-    uint64_t new_cr3 = pmm_alloc_page(0, 0);
+    uint64_t new_cr3 = pmm_alloc_page(0);
 
     if (!new_cr3) {
         kerror_log("PROCESS", "Failed to allocate CR3 page.");
-        halt();
+        panic();
     }
 
     memcpy((void*)(new_cr3 + hhdm), (void*)((old_cr3 & 0x000FFFFFFFFFF000ULL) + hhdm), 4096);
@@ -174,6 +174,8 @@ void process_run(Process* proc) {
     vmm_set_cr3(proc->cr3);
 
     kinfo_log("PROCESS", "Switching to userspace.");
+
+    serial_write("\n");
 
     enter_userspace(proc->rip, proc->rsp);
 }

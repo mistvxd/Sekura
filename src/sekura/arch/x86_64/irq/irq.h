@@ -5,3 +5,4 @@
 void keyboard_stub();
 void timer_handler(InterruptFrame* frame);
 void pit_init(uint32_t frequency);
+void mouse_stub(void);

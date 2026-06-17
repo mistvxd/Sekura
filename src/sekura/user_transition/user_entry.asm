@@ -1,10 +1,8 @@
 global enter_userspace
 
 enter_userspace:
-    ; rdi = rip
-    ; rsi = rsp
+    mov ax, 0x1B
 
-    mov ax, 0x23
     mov ds, ax
     mov es, ax
     mov fs, ax

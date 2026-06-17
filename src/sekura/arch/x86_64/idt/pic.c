@@ -43,13 +43,13 @@ void pic_remap() {
 
     kdebug_log("PIC", "Applying IRQ masks.");
 
-    outb(0x21, 0xFC);
-    outb(0xA1, 0xFF);
+    outb(0x21, 0xF8);
+    outb(0xA1, 0xEF);
 
     uint8_t master = inb(0x21);
     uint8_t slave  = inb(0xA1);
 
-    if (master != 0xFC || slave != 0xFF) {
+    if (master != 0xF8 || slave != 0xEF) {
         kerror_log("PIC", "Failed to apply IRQ masks.");
 
         panic();

@@ -35,7 +35,7 @@ File* create_file(char* name, uint64_t size) {
     file.data = (uint8_t*)fs_next_virtual;
 
     for (uint64_t off = 0; off < aligned_size; off += PAGE_SIZE) {
-        uint64_t phys = pmm_alloc_page(0, 0);
+        uint64_t phys = pmm_alloc_page(0);
 
         file.pages[off / PAGE_SIZE] = phys;
 

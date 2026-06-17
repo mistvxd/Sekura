@@ -176,12 +176,5 @@ void kpanic_log() {
     uint64_t elapsed_ms = ticks;
     serial_writef("[ SEKURA : %dms : PANIC ] [KERNEL] : System initialization failed.\n", elapsed_ms);
     put_textf(0x6b0007, "[ SEKURA : %dms : PANIC ] [KERNEL] : System initialization failed.\n", elapsed_ms);
-    recovery_init();
-}
-
-void kfault_log(char* exception) {
-    uint64_t elapsed_ms = ticks;
-    serial_writef("[ SEKURA : %dms : FAULT ] [IDT] (%s) : An exception occurred. System could not continue execution.\n", elapsed_ms, exception);
-    put_textf(0xe85805, "[ SEKURA : %dms : FAULT ] [IDT] (%s) : An exception occurred. System could not continue execution.\n", elapsed_ms, exception);
-    kpanic_log();
+    asm volatile("cli\n hlt");
 }

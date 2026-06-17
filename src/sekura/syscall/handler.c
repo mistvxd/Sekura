@@ -12,16 +12,20 @@
 #include <limine/limine.h>
 #include <sekura/tools/string.h>
 #include <sekura/scheduler/scheduler.h>
-#include <sekura/filesystem/vfs/vfs.h>
+#include <sekura/modules/modules.h>
+#include <sekura/arch/x86_64/interrupts/mouse.h>
 #include <stddef.h>
 
 extern uint8_t keyboard_buffer[64];
 extern size_t kbf_unread;
 
+extern MouseState mouse_buffer[64];
+extern size_t mbf_unread;
+
 extern struct limine_framebuffer *glb_fb;
 
-char stdout_buffer[64];
-size_t out_unread;
+char stdout_buffer[4096];
+size_t out_unread = 0;
 
 int reserved_fd_count = 4;
 
@@ -69,13 +73,16 @@ int64_t sys_write(uint64_t fd, const void *buf, uint64_t count) {
     uint64_t ptr = (uint64_t)buf;
     
     if (fd == FD_STDOUT) {
-        // writes user buffer in stdout buffer
-        for (size_t i = 0; i < count && i < sizeof(stdout_buffer); i++) {
-            stdout_buffer[i] = ((char*)ptr)[i];
+        size_t written = 0;
+
+        while (written < count &&
+            out_unread < sizeof(stdout_buffer)) {
+            stdout_buffer[out_unread++] = ((char*)buf)[written++];
         }
-        out_unread = count < sizeof(stdout_buffer) ? count : sizeof(stdout_buffer);
-        return 0;
+
+        return written;
     }
+
     if (fd == FD_SERIAL) {
         for (size_t i = 0; i < count; i++) {
             serial_write_char(((char*)ptr)[i]);
@@ -149,6 +156,22 @@ int64_t sys_read(uint64_t fd, void* buf, uint64_t count) {
         return size;
     }
 
+    if (index >= 0 && index < 64 && fd_table[index].type == FD_TYPE_DEVICE && fd_table[index].object == (void*)1) {
+        uint64_t size = mbf_unread;
+
+        if (size > count / sizeof(MouseState))
+            size = count / sizeof(MouseState);
+
+        memcpy(buf, mouse_buffer, size * sizeof(MouseState));
+
+        for (uint64_t i = size; i < mbf_unread; i++)
+            mouse_buffer[i - size] = mouse_buffer[i];
+
+        mbf_unread -= size;
+
+        return size * sizeof(MouseState);
+    }
+
     return 0;
 }
 
@@ -178,13 +201,16 @@ int fd_next(void) {
 }
 
 int64_t sys_open(char* file, int flags) {
-    if (strcmp(file, "sys/meminfo") == 0) {
-        int fd_num = fd_next();
+    if (strcmp(file, "/dev/mouse") == 0) {
+        int fd = fd_next();
 
-        if (fd_num < 0)
+        if (fd < 0)
             return -1;
-        
-        return 0;
+
+        fd_table[fd].type = FD_TYPE_DEVICE;
+        fd_table[fd].object = (void*)1;
+
+        return fd + reserved_fd_count;
     }
 
     File* f = get_file(file);
@@ -241,7 +267,8 @@ void* sys_malloc(size_t size) {
     uint64_t virt = current->heap_end;
 
     for (uint64_t i = 0; i < pages; i++) {
-        uint64_t phys = pmm_alloc_page(0, 0);
+        KernelServices* services = get_kernel_services();
+        uint64_t phys = services->pmm->alloc_page(0);
 
         if (!phys) {
             for (uint64_t j = 0; j < i; j++) {
@@ -268,7 +295,40 @@ void* sys_malloc(size_t size) {
 }
 
 void* sys_sbrk(intptr_t increment) {
-    //
+    if (increment == 0)
+        return NULL;
+
+    uint64_t pages = (increment + PAGE_SIZE - 1) / PAGE_SIZE;
+
+    Process* current = scheduler_current();
+    uint64_t virt = current->heap_end;
+
+    for (uint64_t i = 0; i < pages; i++) {
+        KernelServices* services = get_kernel_services();
+        uint64_t phys = services->pmm->alloc_page(0);
+
+        if (!phys) {
+            for (uint64_t j = 0; j < i; j++) {
+                uint64_t page_virt = virt + j * PAGE_SIZE;
+                uint64_t page_phys = vmm_virt_to_phys(page_virt, hhdm);
+
+                vmm_unmap_page(page_virt, hhdm);
+                pmm_free_page(page_phys);
+            }
+
+            serial_write("[ SEKURA MEMORY REPORT ]\n");
+            serial_write("  Memory allocation FAILED.\n");
+            serial_write("  OOM: Out of physical memory.\n");
+
+            return NULL;
+        }
+
+        vmm_map_page(virt + i * PAGE_SIZE, phys, 0x07, hhdm);
+    }
+
+    current->heap_end += pages * PAGE_SIZE;
+
+    return (void*)virt;
 }
 
 int64_t sys_free(uint64_t virt) {

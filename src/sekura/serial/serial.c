@@ -55,7 +55,37 @@ void serial_write_hex(uint64_t value) {
     }
 }
 
-void serial_write_int(uint64_t value) {
+void serial_write_int(int64_t value) {
+    char buffer[21];
+
+    int i = 20;
+
+    buffer[i] = '\0';
+
+    if (value == 0) {
+        serial_write("0");
+        return;
+    }
+
+    int negative = 0;
+
+    if (value < 0) {
+        negative = 1;
+        value = -value;
+    }
+
+    while (value > 0 && i > 0) {
+        buffer[--i] = '0' + (value % 10);
+        value /= 10;
+    }
+
+    if (negative && i > 0)
+        buffer[--i] = '-';
+
+    serial_write(&buffer[i]);
+}
+
+void serial_write_uint(uint64_t value) {
     char buffer[21];
 
     int i = 20;

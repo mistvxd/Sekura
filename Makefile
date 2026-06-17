@@ -3,7 +3,8 @@ AS = nasm
 LD = ld.lld
 
 CFLAGS = -ffreestanding -fno-stack-protector \
-          -mno-red-zone -m64 -Isrc -mcmodel=kernel
+          -mno-red-zone -m64 -mno-sse -mno-mmx -msoft-float \
+          -Isrc -mcmodel=kernel
 
 ASFLAGS = -f elf64
 
@@ -77,7 +78,7 @@ kvm: all
 		-cdrom sekura.iso \
 		-serial stdio \
 		-accel kvm \
-		-cpu host
+		-cpu host 
 
 debug: all
 	qemu-system-x86_64 \

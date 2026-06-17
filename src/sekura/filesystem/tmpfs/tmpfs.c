@@ -30,14 +30,14 @@ TempFile* tmpfs_find(
         / SECTOR_SIZE;
 
     uint8_t* buffer =
-        (uint8_t*)pmm_alloc_page(hhdm, 0);
+        (uint8_t*)pmm_alloc_page(hhdm);
 
     if (!buffer)
         return NULL;
 
     // temporary contiguous allocation
     for (uint32_t i = 1; i < pages; i++) {
-        pmm_alloc_page(hhdm, 0);
+        pmm_alloc_page(hhdm);
     }
 
     for (uint32_t i = 0; i < sectors; i++) {

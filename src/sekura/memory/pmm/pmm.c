@@ -28,7 +28,7 @@ void pmm_push_memmap(struct limine_memmap_response* mmap_rp) {
     memmap = mmap_rp;
 }
 
-int pmm_initialize(int verbose) {
+int pmm_initialize() {
     kdebug_log("PMM", "Parsing bootloader memory map.");
 
     if (!memmap) {
@@ -68,7 +68,7 @@ int pmm_initialize(int verbose) {
     return 0;
 }
 
-int pmm_prepare_bitmap(uint64_t hhdm, int verbose) {
+int pmm_prepare_bitmap(uint64_t hhdm) {
     kdebug_log("PMM", "Preparing allocation bitmap.");
 
     uint64_t total_pages = highest_addr / PAGE_SIZE;
@@ -127,7 +127,7 @@ int pmm_prepare_bitmap(uint64_t hhdm, int verbose) {
     return 0;
 }
 
-int pmm_alloc_page_index(int page, int verbose) {
+int pmm_alloc_page_index(int page) {
     return 1;
     /*
     int byte = page / 8;
@@ -142,12 +142,10 @@ int pmm_alloc_page_index(int page, int verbose) {
     */
 }
 
-uint64_t pmm_alloc_page(uint64_t offset, int verbose) {
+uint64_t pmm_alloc_page(uint64_t offset) {
     int f_byte;
     int f_bit;
     int found = 0;
-
-    PMM_VERBOSE_LOG(verbose, "\n[PMM]: Allocating...");
 
     for (size_t byte = 0; byte < bitmap_size; byte++) {
         for (size_t bit = 0; bit < 8; bit++) {
@@ -162,13 +160,10 @@ uint64_t pmm_alloc_page(uint64_t offset, int verbose) {
     }
 
     if (!found) { 
-        PMM_VERBOSE_LOG(verbose, "\n[PMM]: Couldn't find a available page to allocate.\n");
         return 0;
     }
 
     bitmap[f_byte] |= (1 << f_bit);
-
-    PMM_VERBOSE_LOG(verbose, "\n[PMM]: Sucessfully allocated page.\n");
 
     uint64_t page = (f_byte * 8) + f_bit;
     uint64_t addr = page * PAGE_SIZE;
@@ -203,4 +198,8 @@ uint64_t pmm_used_pages(void) {
 
 uint64_t pmm_total_memory(void) {
     return total_memory;
+}
+
+uint64_t pmm_total_pages(void) {
+    return total_memory / 4096;
 }

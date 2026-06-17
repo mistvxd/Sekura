@@ -13,6 +13,8 @@
 #include <sekura/tools/string.h>
 #include <sekura/tools/itoa.h>
 
+#include <sekura/arch/x86_64/interrupts/mouse.h>
+
 static idt_entry_t idt[IDT_ENTRIES];
 static idtr_t idtr;
 
@@ -41,11 +43,24 @@ void idt_set_gate(uint8_t vector, void* isr, uint8_t flags) {
 }
 
 void exception_handler(uint64_t* stack) {
-    serial_write("\n<      SEKURA WARNING      >\n\n");
-    serial_write("> from IDT:\n");
-    serial_write("[  AN EXCEPTION OCCURRED   ]\n\n");
-    serial_write("     SYSTEM MUST HALT    \n\n");
-    kfault_log("sys_generic_exception");
+    uint64_t rip   = stack[8];
+    uint64_t cs    = stack[9];
+    uint64_t flags = stack[10];
+    uint64_t rsp   = stack[11];
+
+    uint64_t cr3;
+
+    uint64_t cpl = cs & 0x3;
+
+    serial_write("\n[ SEKURA : #UNK]");
+
+    serial_write(" RIP=");
+    serial_write_hex(rip);
+
+    serial_write(" CPL=");
+    serial_write_hex(cpl);
+
+    serial_write("\n");
 }
 
 uint64_t read_cr2(void) {
@@ -68,88 +83,23 @@ void gpf_handler(uint64_t* stack) {
 
     uint64_t cr3;
 
-    asm volatile(
-        "mov %%cr3, %0"
-        : "=r"(cr3)
-    );
+    uint64_t cpl = cs & 0x3;
 
-    char msg[256];
-    char buf[32];
+    serial_write("\n[ SEKURA : #GP]");
 
-    memcpy(msg, "RIP=", 5);
+    serial_write(" RIP=");
+    serial_write_hex(rip);
 
-    uitoa(rip, buf, 16);
-    strcat(msg, buf);
+    serial_write(" ERR=");
+    serial_write_hex(error);
 
-    strcat(msg, " RSP=");
+    serial_write(" CPL=");
+    serial_write_hex(cpl);
 
-    uitoa(rsp, buf, 16);
-    strcat(msg, buf);
+    serial_write("\n");
 
-    strcat(msg, " ERR=");
-
-    uitoa(error, buf, 16);
-    strcat(msg, buf);
-
-    kerror_log("GPF", msg);
-
-    msg[0] = '\0';
-
-    memcpy(msg, "CS=", 4);
-
-    uitoa(cs, buf, 16);
-    strcat(msg, buf);
-
-    strcat(msg, " CR3=");
-
-    uitoa(cr3, buf, 16);
-    strcat(msg, buf);
-
-    strcat(msg, " RFLAGS=");
-
-    uitoa(flags, buf, 16);
-    strcat(msg, buf);
-
-    kerror_log("GPF", msg);
-
-    msg[0] = '\0';
-
-    memcpy(msg, "SEL=", 5);
-
-    uitoa(error & ~0x7, buf, 16);
-    strcat(msg, buf);
-
-    strcat(msg, " MODE=");
-
-    strcat(msg, (cs & 3) ? "USER" : "KERNEL");
-
-    kerror_log("GPF", msg);
-
-    msg[0] = '\0';
-
-    memcpy(msg, "RAX=", 5);
-
-    uitoa(stack[6], buf, 16);
-    strcat(msg, buf);
-
-    strcat(msg, " RBX=");
-
-    uitoa(stack[3], buf, 16);
-    strcat(msg, buf);
-
-    strcat(msg, " RCX=");
-
-    uitoa(stack[5], buf, 16);
-    strcat(msg, buf);
-
-    strcat(msg, " RDX=");
-
-    uitoa(stack[4], buf, 16);
-    strcat(msg, buf);
-
-    kerror_log("GPF", msg);
-
-    kfault_log("sys_protection_exception");
+    for (;;)
+        asm volatile("cli; hlt");
 }
 
 void pf_handler(uint64_t* stack) {
@@ -168,155 +118,29 @@ void pf_handler(uint64_t* stack) {
 
     uint64_t cpl = cs & 0x3;
 
-    serial_write("\n<    SEKURA FATAL ERROR    >\n\n");
-    serial_write("[        PAGE FAULT        ]\n");
-    serial_write("\n");
+    serial_write("\n[ SEKURA : #PF]");
 
-    serial_write(" RIP    : ");
+    serial_write(" RIP=");
     serial_write_hex(rip);
-    serial_write("\n");
 
-    serial_write(" RSP    : ");
-    serial_write_hex(rsp);
-    serial_write("\n");
-
-    serial_write(" CS     : ");
-    serial_write_hex(cs);
-    serial_write("\n");
-
-    serial_write(" SS     : ");
-    serial_write_hex(ss);
-    serial_write("\n");
-
-    serial_write(" RFLAGS : ");
-    serial_write_hex(flags);
-    serial_write("\n");
-
-    serial_write(" CR2    : ");
+    serial_write(" CR2=");
     serial_write_hex(cr2);
-    serial_write("\n");
 
-    serial_write(" CR3    : ");
-    serial_write_hex(cr3);
-    serial_write("\n");
-
-    serial_write(" ERROR  : ");
+    serial_write(" ERR=");
     serial_write_hex(error);
-    serial_write("\n");
 
-    serial_write(" +DETAILS:\n");
-
-    serial_write("   PRESENT  : ");
-    serial_write((error & 1) ? "YES" : "NO");
-    serial_write("\n");
-
-    serial_write("   ACCESS   : ");
-    serial_write((error & 2) ? "WRITE" : "READ");
-    serial_write("\n");
-
-    serial_write("   ORIGIN   : ");
-    serial_write((error & 4) ? "USER" : "KERNEL");
-    serial_write("\n");
-
-    serial_write("   RESERVED : ");
-    serial_write((error & 8) ? "YES" : "NO");
-    serial_write("\n");
-
-    serial_write("   EXECUTE  : ");
-    serial_write((error & 16) ? "YES" : "NO");
-    serial_write("\n");
+    serial_write(" CPL=");
+    serial_write_hex(cpl);
 
     serial_write("\n");
-    serial_write(" +REGISTERS:\n");
 
-    serial_write("   RDI : "); serial_write_hex(stack[0]); serial_write("\n");
-    serial_write("   RSI : "); serial_write_hex(stack[1]); serial_write("\n");
-    serial_write("   RBP : "); serial_write_hex(stack[2]); serial_write("\n");
-    serial_write("   RBX : "); serial_write_hex(stack[3]); serial_write("\n");
-
-    serial_write("   RDX : "); serial_write_hex(stack[4]); serial_write("\n");
-    serial_write("   RCX : "); serial_write_hex(stack[5]); serial_write("\n");
-    serial_write("   RAX : "); serial_write_hex(stack[6]); serial_write("\n");
-
-    serial_write("\n");
-    serial_write(" +STACK:\n");
-
-    uint64_t page_base =
-        rsp & ~0xFFFULL;
-
-    for (int i = 0; i < 8; i++) {
-        uint64_t addr =
-            rsp + (i * 8);
-
-        if (
-            (addr & ~0xFFFULL)
-            != page_base
-        ) {
-            serial_write(
-                "   [NEXT PAGE]\n"
-            );
-            break;
-        }
-
-        serial_write("   ");
-        serial_write_hex(addr);
-        serial_write(" : ");
-        serial_write_hex(
-            *(uint64_t*)addr
-        );
-        serial_write("\n");
-    }
-
-    serial_write("\n");
-    serial_write(" MODE   : ");
-
-    if (cpl == 3)
-        serial_write("USER");
-    else
-        serial_write("KERNEL");
-
-    serial_write("\n\n");
-    serial_write("      SYSTEM MUST HALT      \n\n");
-    kfault_log("sys_page_exception");
+    for (;;)
+        asm volatile("cli; hlt");
 }
 
 void df_handler(uint64_t* stack) {
-    uint64_t error = stack[7];
-    uint64_t rip   = stack[8];
-    uint64_t cs    = stack[9];
-    uint64_t flags = stack[10];
-    uint64_t rsp   = stack[11];
-    uint64_t ss    = stack[12];
-    uint64_t cpl = cs & 0x3;
-    serial_write("\n<       SEKURA PANIC       >\n\n");
-    serial_write("[       DOUBLE FAULT       ]\n");
-    serial_write("\n");
-    serial_write(" RIP    : ");
-    serial_write_hex(rip);
-    serial_write("\n");
-
-    serial_write(" RSP    : ");
-    serial_write_hex(rsp);
-    serial_write("\n");
-
-    serial_write(" CS     : ");
-    serial_write_hex(cs);
-    serial_write("\n");
-    
-    serial_write(" SS     : ");
-    serial_write_hex(ss);
-    serial_write("\n");
-
-    serial_write(" RFLAGS : ");
-    serial_write_hex(flags);
-    serial_write("\n");
-
-    serial_write(" ERROR  : ");
-    serial_write_hex(error);
-    serial_write("\n\n");
-
-    serial_write("      SYSTEM MUST HALT      \n\n");
-    kfault_log("sys_double_exception");
+    for (;;)
+        asm volatile("cli; hlt");
 }
 
 __attribute__((naked))
@@ -394,17 +218,6 @@ void isr_df() {
 
         "mov %rsp, %rdi\n"
         "call df_handler\n"
-
-        "hlt\n"
-        "hlt\n"
-        "hlt\n"
-        "hlt\n"
-        "hlt\n"
-        "hlt\n"
-        "hlt\n"
-        "hlt\n"
-        "hlt\n"
-        "hlt\n"
     );
 }
 
@@ -437,11 +250,9 @@ void idt_init() {
 
     kdebug_log("IDT", "Initializing PIT.");
 
-    pit_init(1000);
-
     kdebug_log("IDT", "Registering exception handlers.");
 
-    for (int i = 0; i < 31; i++) {
+    for (int i = 0; i < 32; i++) {
         idt_set_gate(i, isr_common, 0x8E);
     }
 
@@ -468,6 +279,7 @@ void idt_init() {
 
     idt_set_gate(0x20, irq0, 0x8E);
     idt_set_gate(0x21, keyboard_stub, 0x8E);
+    idt_set_gate(0x2C, mouse_stub, 0x8E);
 
     if (!idt[0x20].offset_low) {
         kerror_log("IDT", "Timer IRQ registration failed.");
@@ -481,7 +293,17 @@ void idt_init() {
         panic();
     }
 
+    if (!idt[0x2C].offset_low) {
+        kerror_log("IDT", "Mouse IRQ registration failed.");
+
+        panic();
+    }
+
+    mouse_init();
+
     kdebug_log("IDT", "Enabling interrupts.");
+
+    pit_init(1000);
 
     sti();
 

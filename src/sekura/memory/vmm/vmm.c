@@ -3,6 +3,7 @@
 #include <sekura/tools/memset.h>
 #include <sekura/memory/vmm/vmm.h>
 #include <sekura/memory/pmm/pmm.h>
+#include <sekura/arch/x86_64/cpu/pat.h>
 
 static uint64_t* get_next_level(
     uint64_t* table,
@@ -13,7 +14,7 @@ static uint64_t* get_next_level(
     if (!(table[index] & 1)) {
 
         uint64_t phys =
-            (uint64_t)pmm_alloc_page(0, 0);
+            pmm_alloc_page(0);
 
         uint64_t* virt =
             (uint64_t*)(phys + hhdm);
@@ -101,6 +102,7 @@ void vmm_map_page(
 void vmm_unmap_page(uint64_t virt, uint64_t hhdm) {
     uint64_t cr3;
     __asm__ volatile ("mov %%cr3, %0" : "=r"(cr3));
+    cr3 &= 0x000FFFFFFFFFF000;
 
     uint64_t *pml4 = (uint64_t *)(cr3 + hhdm);
 
