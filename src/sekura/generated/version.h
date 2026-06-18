@@ -1,2 +1,2 @@
-#define SEKURA_BUILD 512
+#define SEKURA_BUILD 534
 #define SEKURA_COMMIT ""

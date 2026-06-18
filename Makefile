@@ -78,7 +78,9 @@ kvm: all
 		-cdrom sekura.iso \
 		-serial stdio \
 		-accel kvm \
-		-cpu host 
+		-cpu host \
+		-usb \
+  		-device usb-tablet
 
 debug: all
 	qemu-system-x86_64 \
@@ -86,7 +88,9 @@ debug: all
 		-serial stdio \
 		-d int,cpu_reset \
 		-no-reboot \
-		-no-shutdown
+		-no-shutdown \
+		-usb \
+  		-device usb-tablet
 
 dekvm: all
 	qemu-system-x86_64 \

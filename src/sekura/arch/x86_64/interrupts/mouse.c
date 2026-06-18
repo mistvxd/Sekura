@@ -64,15 +64,9 @@ void mouse_init(void) {
     uint8_t config;
     uint8_t response;
 
-    asm volatile ("cli");
-
-    if (!ps2_wait_write())
-        return;
-
     outb(0x64, 0xA8);
 
-    if (!ps2_wait_write())
-        return;
+    outb(0x64, 0x20);
 
     if (!mouse_read(&config))
         return;
@@ -80,14 +74,7 @@ void mouse_init(void) {
     config |= 0x02;
     config &= ~(1 << 5);
 
-    if (!ps2_wait_write())
-        return;
-
     outb(0x64, 0x60);
-
-    if (!ps2_wait_write())
-        return;
-
     outb(0x60, config);
 
     if (!mouse_write(0xF6))
@@ -108,11 +95,10 @@ void mouse_init(void) {
     if (response != 0xFA)
         return;
 
-    mouse.x = 0;
-    mouse.y = 0;
+    mouse.x = glb_fb->width / 2;
+    mouse.y = glb_fb->height / 2;
 
     packet_index = 0;
-    asm volatile ("sti");
 }
 
 void mouse_handler(void) {
@@ -139,20 +125,17 @@ void mouse_handler(void) {
     mouse.x += (int8_t)packet[1];
     mouse.y -= (int8_t)packet[2];
 
-    int32_t half_w = glb_fb->width / 2;
-    int32_t half_h = glb_fb->height / 2;
+    if (mouse.x < 0)
+        mouse.x = 0;
 
-    if (mouse.x < -half_w)
-        mouse.x = -half_w;
+    if (mouse.y < 0)
+        mouse.y = 0;
 
-    if (mouse.y < -half_h)
-        mouse.y = -half_h;
+    if (mouse.x >= glb_fb->width)
+        mouse.x = glb_fb->width - 1;
 
-    if (mouse.x >= half_w)
-        mouse.x = half_w - 1;
-
-    if (mouse.y >= half_h)
-        mouse.y = half_h - 1;
+    if (mouse.y >= glb_fb->height)
+        mouse.y = glb_fb->height - 1;
 
     if (mbf_unread < 256) {
         mouse_buffer[mbf_unread++] = mouse;
