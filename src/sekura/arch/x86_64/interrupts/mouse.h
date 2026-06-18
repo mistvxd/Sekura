@@ -4,9 +4,9 @@ typedef struct {
     int32_t x;
     int32_t y;
 
-    int left;
-    int right;
-    int middle;
+    uint8_t left;
+    uint8_t right;
+    uint8_t middle;
 } MouseState;
 
 extern MouseState mouse;
