@@ -357,16 +357,6 @@ void cmd_cpu(int argc, char** argv) {
     recovery_printf(0xffffff, "CPU : %s\n", brand);
 }
 
-void cmd_ls(int argc, char** argv) {
-    for (uint64_t i = 0; i < file_count; i++) {
-        recovery_printf(
-            0xffffff,
-            "%s\n",
-            files[i].name
-        );
-    }
-}
-
 void cmd_resume(int argc, char** argv) {
     leave_recovery = 1;
     scheduler_paused = 0;
@@ -442,7 +432,6 @@ static Command commands[] = {
     {"hhdm", cmd_hhdm},
     {"current", cmd_current},
     {"cpu", cmd_cpu},
-    {"ls", cmd_ls},
     {"resume", cmd_resume},
     {"sys", cmd_sys}
 };

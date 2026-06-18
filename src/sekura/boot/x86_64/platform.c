@@ -13,6 +13,7 @@
 #include <sekura/memory/vmm/vmm.h>
 #include <sekura/serial/serial.h>
 #include <sekura/arch/x86_64/cpu/pat.h>
+#include <sekura/filesystem/vfs/vfs.h>
 
 __attribute__((used, section(".limine_requests_start")))
 static volatile LIMINE_REQUESTS_START_MARKER;
@@ -119,7 +120,7 @@ void boot_platform_initialize_architecture(const BootContext* context) {
 
     kcr3 = vmm_get_cr3();
 
-    ata_disk_init();
+    //ata_disk_init();
 
     tss_initialize(kernel_stack_top);
 
@@ -138,6 +139,14 @@ void boot_platform_initialize_architecture(const BootContext* context) {
     ps2_config();
 
     pat_init();
+
+    vfs_init();
+
+    mkdir("/dev");
+    mkdir("/bin");
+    mkdir("/etc");
+    mkdir("/home");
+    mkdir("/sys");
 
     kinfo_log("BOOT", "Architecture initialized.");
 }

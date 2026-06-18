@@ -71,10 +71,9 @@ void boot_userspace_initialize(Process* init, const BootContext* context) {
     fb_info->height = context->framebuffer->height;
     fb_info->pitch = context->framebuffer->pitch;
 
-    File* fb_file =
-        create_file("sys/fb0", sizeof(FramebufferFile));
+    VfsNode* fb_node = create_file("/sys/fb0", sizeof(FramebufferFile));
 
-    if (!fb_file) {
+    if (!fb_node) {
         kerror_log("USERSPACE", "Failed to create framebuffer file.");
         panic();
     }
@@ -86,7 +85,11 @@ void boot_userspace_initialize(Process* init, const BootContext* context) {
         .pitch = context->framebuffer->pitch
     };
 
-    memcpy(fb_file->data, &fb, sizeof(FramebufferFile));
+    memcpy(
+        fb_node->file.data,
+        &fb,
+        sizeof(FramebufferFile)
+    );
 
     service->vmm->map(USER_FB_INFO, phys, 0x07, hhdm);
 

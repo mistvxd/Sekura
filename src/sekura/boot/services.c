@@ -22,9 +22,6 @@ static Scheduler kernel_sched = {
 };
 
 static Filesystem kernel_vfs = {
-    .create = create_file,
-    .get = get_file,
-    .delete = delete_file,
     .read = read_file,
     .write = write_file
 };

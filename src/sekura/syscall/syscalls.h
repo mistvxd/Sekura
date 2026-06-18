@@ -15,16 +15,20 @@ enum {
 };
 
 enum {
-    SYSCALL_READ    = 0,
-    SYSCALL_WRITE   = 1,
-    SYSCALL_OPEN    = 2,
-    SYSCALL_CLOSE   = 3,
-    SYSCALL_IOCTL   = 4,
-    SYSCALL_MALLOC  = 5,
-    SYSCALL_FREE    = 6,
-    SYSCALL_SPAWN   = 7,
-    SYSCALL_SEEK    = 8,
-    SYSCALL_READDIR = 9,
-    SYSCALL_REBOOT  = 10,
-    SYSCALL_SLEEP   = 11,
+    SYSCALL_READ     = 0,
+    SYSCALL_WRITE    = 1,
+    SYSCALL_OPEN     = 2,
+    SYSCALL_CLOSE    = 3,
+    SYSCALL_IOCTL    = 4,
+    SYSCALL_MALLOC   = 5,
+    SYSCALL_FREE     = 6,
+    SYSCALL_SPAWN    = 7,
+    SYSCALL_SEEK     = 8,
+    SYSCALL_OPENDIR  = 9,
+    SYSCALL_CLOSEDIR = 10,
+    SYSCALL_READDIR  = 11,
+    SYSCALL_MKDIR    = 12,
+    SYSCALL_REBOOT   = 13,
+    SYSCALL_SBRK     = 14,
+    SYSCALL_SLEEP    = 15
 };
