@@ -20,11 +20,9 @@ void boot_log_kernel_version(void) {
 
     memset(kernel_name, 0, sizeof(kernel_name));
 
-    strcat(kernel_name, "Sekura Kernel v");
+    strcat(kernel_name, "Sekura ");
     strcat(kernel_name, SEKURA_VERSION);
-    strcat(kernel_name, " \"");
-    strcat(kernel_name, SEKURA_CODENAME);
-    strcat(kernel_name, "\" Build ");
+    strcat(kernel_name, " Build ");
 
     uitoa(SEKURA_BUILD, build, 10);
 

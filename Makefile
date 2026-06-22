@@ -3,8 +3,8 @@ AS = nasm
 LD = ld.lld
 
 CFLAGS = -ffreestanding -fno-stack-protector \
-          -mno-red-zone -m64 -mno-sse -mno-mmx -msoft-float \
-          -Isrc -mcmodel=kernel
+          -mno-red-zone -m64 \
+          -Isrc -mcmodel=kernel -msse2
 
 ASFLAGS = -f elf64
 

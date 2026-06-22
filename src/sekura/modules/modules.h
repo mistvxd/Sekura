@@ -6,7 +6,7 @@
 #include <sekura/filesystem/vfs/vfs.h>
 
 typedef struct {
-    uint64_t (*alloc_page)(uint64_t offset);
+    uint64_t (*alloc_page)(uint64_t offset, const char* func, int line, const char* file);
     void (*free_page)(uint64_t phys);
 
     uint64_t (*used_pages)(void);

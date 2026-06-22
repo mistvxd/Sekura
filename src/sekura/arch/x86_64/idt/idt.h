@@ -28,7 +28,8 @@ typedef struct {
     uint64_t ss;
 } interrupt_frame;
 
-void idt_init();
+void idt_init(void);
 void idt_set_gate(uint8_t vector, void* isr, uint8_t flags);
+int idt_has_gate(uint8_t vector);
 
 #endif

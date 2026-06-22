@@ -57,7 +57,7 @@ void boot_userspace_initialize(Process* init, const BootContext* context) {
         service->vmm->map(USER_FB + off, fb_phys + off, PAGE_PRESENT | PAGE_WRITE | PAGE_USER | PAGE_CACHE_WC, context->hhdm);
     }
 
-    uint64_t phys = service->pmm->alloc_page(0);
+    uint64_t phys = service->pmm->alloc_page(0, __func__, __LINE__, __FILE__);
 
     if (!phys) {
         kerror_log("USERSPACE", "Failed to allocate framebuffer info page.");

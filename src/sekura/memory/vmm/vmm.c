@@ -14,7 +14,7 @@ static uint64_t* get_next_level(
     if (!(table[index] & 1)) {
 
         uint64_t phys =
-            pmm_alloc_page(0);
+            pmm_alloc_page(0, __func__, __LINE__, __FILE__);
 
         uint64_t* virt =
             (uint64_t*)(phys + hhdm);

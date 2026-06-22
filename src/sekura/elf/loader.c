@@ -28,7 +28,7 @@ static void map_segment_pages(
         addr += PAGE_SIZE
     ) {
         uint64_t phys =
-            pmm_alloc_page(0);
+            pmm_alloc_page(0, __func__, __LINE__, __FILE__);
 
         vmm_map_page(
             addr,

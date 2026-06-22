@@ -142,7 +142,7 @@ int pmm_alloc_page_index(int page) {
     */
 }
 
-uint64_t pmm_alloc_page(uint64_t offset) {
+uint64_t pmm_alloc_page(uint64_t offset, const char* tag, int line, const char* file) {
     int f_byte;
     int f_bit;
     int found = 0;
@@ -167,6 +167,8 @@ uint64_t pmm_alloc_page(uint64_t offset) {
 
     uint64_t page = (f_byte * 8) + f_bit;
     uint64_t addr = page * PAGE_SIZE;
+
+    //serial_writef("[PMM] : (%s) -> %s:%d has requested a page.\n", file, tag, line);
 
     return addr + offset;
 }

@@ -1,9 +1,11 @@
 #include <stdint.h>
 
 #include <sekura/arch/x86_64/idt/pic.h>
+#include <sekura/arch/x86_64/io/io.h>
 #include <sekura/scheduler/scheduler.h>
 
 #include <sekura/logs/log.h>
+#include <sekura/serial/serial.h>
 
 extern void panic(void);
 extern void show_meminfo(void);
@@ -12,19 +14,8 @@ extern void show_meminfo(void);
 
 uint64_t ticks;
 
-static inline void outb(
-    uint16_t port,
-    uint8_t value
-) {
-    asm volatile(
-        "outb %0,%1"
-        :
-        : "a"(value),
-          "Nd"(port)
-    );
-}
-
 void timer_handler(InterruptFrame* frame) {
+    //serial_writef(".");
     ticks++;
 
     if (ticks % 5000 == 0)

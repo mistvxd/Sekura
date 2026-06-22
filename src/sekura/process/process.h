@@ -41,6 +41,9 @@ typedef struct {
     
     uint64_t heap_start;
     uint64_t heap_end;
+
+    __attribute__((aligned(16)))
+    uint8_t fpu_state[512];
 } Process;
 
 typedef struct {

@@ -8,7 +8,7 @@
 #include <sekura/serial/serial.h>
 #include <sekura/elf/loader.h>
 #include <sekura/tools/string.h>
-
+#include <sekura/boot/info.h>
 #include <sekura/logs/log.h>
 extern void panic(void);
 
@@ -27,6 +27,8 @@ static uint64_t next_stack = 0x1000000;
 extern uint64_t kcr3;
 
 static Process* process_alloc(void) {
+    serial_writef("sizeof(Process) = %d\n", sizeof(Process));
+    serial_writef("sizeof(processes) = %d\n", sizeof(processes));
     kdebug_log("PROCESS", "Searching for available process slot.");
 
     for (int i = 0; i < MAX_PROCESSES; i++) {
@@ -71,7 +73,7 @@ static uint64_t process_create_stack(void) {
     uint64_t base = next_stack;
 
     for (int i = 0; i < 4; i++) {
-        uint64_t page = pmm_alloc_page(0);
+        uint64_t page = pmm_alloc_page(0, __func__, __LINE__, __FILE__);
 
         if (!page) {
             kerror_log("PROCESS", "Failed to allocate stack page.");
@@ -95,7 +97,7 @@ static uint64_t process_create_cr3(void) {
 
     __asm__ volatile ("mov %%cr3, %0" : "=r"(old_cr3));
 
-    uint64_t new_cr3 = pmm_alloc_page(0);
+    uint64_t new_cr3 = pmm_alloc_page(0, __func__, __LINE__, __FILE__);
 
     if (!new_cr3) {
         kerror_log("PROCESS", "Failed to allocate CR3 page.");
@@ -174,6 +176,8 @@ void process_run(Process* proc) {
     vmm_set_cr3(proc->cr3);
 
     kinfo_log("PROCESS", "Switching to userspace.");
+
+    show_meminfo();
 
     serial_write("\n");
 

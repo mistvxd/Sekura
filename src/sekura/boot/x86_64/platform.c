@@ -14,6 +14,9 @@
 #include <sekura/serial/serial.h>
 #include <sekura/arch/x86_64/cpu/pat.h>
 #include <sekura/filesystem/vfs/vfs.h>
+#include <sekura/arch/x86_64/stream/sse2/sse2.h>
+#include <sekura/tools/string.h>
+#include <sekura/tools/memset.h>
 
 __attribute__((used, section(".limine_requests_start")))
 static volatile LIMINE_REQUESTS_START_MARKER;
@@ -58,6 +61,7 @@ struct limine_framebuffer* glb_fb;
 
 extern void enable_syscalls(void);
 extern void ps2_config(void);
+extern uint64_t ticks;
 
 void halt(void) {
     serial_write("===== [HALTED] =====\n\n");
@@ -114,6 +118,35 @@ void boot_platform_load_context(BootContext* context) {
     }
 }
 
+void vfs_import_boot_modules(struct limine_module_response* modules) {
+    for (uint64_t i = 0; i < modules->module_count; i++) {
+
+        struct limine_file* mod = modules->modules[i];
+
+        VfsNode* file = create_file(mod->path, mod->size);
+
+        file->file.data = mod->address;
+    }
+}
+
+void boot_platform_initialize_filesystem(BootContext* context) {
+    vfs_init();
+
+    mkdir("/dev");
+    mkdir("/bin");
+    mkdir("/etc");
+    mkdir("/home");
+    mkdir("/sys");
+    mkdir("/rootfs");
+    mkdir("/sysinit");
+}
+
+void boot_platform_initialize_accelerations(BootContext* context) {
+    enable_syscalls();
+    pat_init();
+    sse_init();
+}
+
 void boot_platform_initialize_architecture(const BootContext* context) {
     uint64_t kernel_stack_top =
         (uint64_t)(kernel_stack + sizeof(kernel_stack));
@@ -122,13 +155,13 @@ void boot_platform_initialize_architecture(const BootContext* context) {
 
     //ata_disk_init();
 
+    boot_platform_initialize_accelerations(context);
+
     tss_initialize(kernel_stack_top);
 
     gdt_initialize();
 
     idt_init();
-
-    enable_syscalls();
 
     pmm_push_memmap(context->memmap);
 
@@ -136,17 +169,9 @@ void boot_platform_initialize_architecture(const BootContext* context) {
 
     pmm_prepare_bitmap(context->hhdm);
 
-    ps2_config();
+    //ps2_config();
 
-    pat_init();
-
-    vfs_init();
-
-    mkdir("/dev");
-    mkdir("/bin");
-    mkdir("/etc");
-    mkdir("/home");
-    mkdir("/sys");
+    boot_platform_initialize_filesystem(context);
 
     kinfo_log("BOOT", "Architecture initialized.");
 }

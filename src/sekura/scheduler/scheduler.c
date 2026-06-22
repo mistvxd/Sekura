@@ -4,6 +4,7 @@
 #include <sekura/memory/vmm/vmm.h>
 #include <sekura/serial/serial.h>
 #include <sekura/recovery/recovery.h>
+#include <sekura/arch/x86_64/fpu/fpu.h>
 
 #include <sekura/logs/log.h>
 
@@ -36,11 +37,9 @@ void scheduler_start(void) {
 
     scheduler_started = 1;
 
-    kdebug_log("SCHED", "Analysing scheduler.");
+    kinfo_log("SCHED", "Scheduler started.");
 
     process_run(current_process);
-
-    kinfo_log("SCHED", "Scheduler started.");
 }
 
 Process* scheduler_next(void) {
@@ -56,33 +55,33 @@ Process* scheduler_next(void) {
     return current_process;
 }
 
-void context_switch(InterruptFrame* frame, Process* from, Process* to) {
-    if (from) {
-        from->rip = frame->rip;
-        from->rsp = frame->rsp;
+void save_context(InterruptFrame* frame, Process* from) {
+    from->rip = frame->rip;
+    from->rsp = frame->rsp;
 
-        from->rax = frame->rax;
-        from->rbx = frame->rbx;
-        from->rcx = frame->rcx;
-        from->rdx = frame->rdx;
+    from->rax = frame->rax;
+    from->rbx = frame->rbx;
+    from->rcx = frame->rcx;
+    from->rdx = frame->rdx;
 
-        from->rsi = frame->rsi;
-        from->rdi = frame->rdi;
+    from->rsi = frame->rsi;
+    from->rdi = frame->rdi;
 
-        from->rbp = frame->rbp;
+    from->rbp = frame->rbp;
 
-        from->r8  = frame->r8;
-        from->r9  = frame->r9;
-        from->r10 = frame->r10;
-        from->r11 = frame->r11;
-        from->r12 = frame->r12;
-        from->r13 = frame->r13;
-        from->r14 = frame->r14;
-        from->r15 = frame->r15;
+    from->r8  = frame->r8;
+    from->r9  = frame->r9;
+    from->r10 = frame->r10;
+    from->r11 = frame->r11;
+    from->r12 = frame->r12;
+    from->r13 = frame->r13;
+    from->r14 = frame->r14;
+    from->r15 = frame->r15;
 
-        from->rflags = frame->rflags;
-    }
+    from->rflags = frame->rflags;
+}
 
+void load_context(InterruptFrame* frame, Process* to) {
     vmm_set_cr3(to->cr3);
 
     frame->rip = to->rip;
@@ -108,22 +107,33 @@ void context_switch(InterruptFrame* frame, Process* from, Process* to) {
     frame->r15 = to->r15;
 
     frame->rflags = to->rflags;
+}
+
+void context_switch(InterruptFrame* frame, Process* from, Process* to) {
+    save_context(frame, from);
+    fxsave(from->fpu_state);
+    load_context(frame, to);
+    fxrstor(to->fpu_state);
 
     current_process = to;
 }
 
 void scheduler_tick(InterruptFrame* frame) {
-    if (recovery_requested) {recovery_keybind(); recovery_requested = 0;}
-    if (!scheduler_started || scheduler_paused) return;
+    if (!scheduler_started || scheduler_paused)
+        return;
+
     Process* next = scheduler_next();
-    if (next->started) {
-        context_switch(frame, current_process, next);
-    } else {
-        current_process = next;
-        process_run(next);
+
+    if (next == current_process)
+        return;
+
+    if (!next->started) {
+        next->started = 1;
     }
+
+    context_switch(frame, current_process, next);
 }
 
 Process* scheduler_current(void) {
     return current_process;
-}
+}uint64_t current_kernel_stack = 0;

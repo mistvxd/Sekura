@@ -97,7 +97,7 @@ static void *alloc_user_pages(uint64_t pages, uint64_t *virt_out) {
 
     for (uint64_t i = 0; i < pages; i++) {
         KernelServices *svc = get_kernel_services();
-        uint64_t phys = svc->pmm->alloc_page(0);
+        uint64_t phys = svc->pmm->alloc_page(0, __func__, __LINE__, __FILE__);
 
         if (!phys) {
             for (uint64_t j = 0; j < i; j++) {
@@ -278,9 +278,16 @@ void *sys_malloc(size_t size) {
 }
 
 void *sys_sbrk(intptr_t increment) {
-    if (increment == 0) return NULL;
-    uint64_t pages = ((uint64_t)increment + PAGE_SIZE - 1) / PAGE_SIZE;
-    return alloc_user_pages(pages, NULL);
+    Process* current = scheduler_current();
+    uint64_t old_break = current->heap_end;
+
+    if (increment == 0)
+        return (void*)old_break;
+
+    current->heap_end += increment;
+    uint64_t heap_total = current->heap_end - current->heap_start;
+    serial_writef("PROCESS PID %d HEAP EXTENDS TO %dMB (%dKB)\n", current->pid, heap_total / 1024 / 1024, heap_total / 1024);
+    return (void*)old_break;
 }
 
 int64_t sys_free(uint64_t virt) {
@@ -293,7 +300,7 @@ int64_t sys_free(uint64_t virt) {
 }
 
 int64_t sys_spawn(void *buf) {
-    process_create((char *)buf);
+    process_create((char*)buf);
     return 0;
 }
 

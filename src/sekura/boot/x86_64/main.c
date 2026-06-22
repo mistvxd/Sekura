@@ -22,13 +22,9 @@ void kernel_main(void) {
 
     boot_log_kernel_version();
 
-    Process* init =
-        boot_create_init_process();
+    Process* init = boot_create_init_process();
 
-    boot_userspace_initialize(
-        init,
-        &context
-    );
+    boot_userspace_initialize(init, &context);
 
     scheduler_start();
 }
