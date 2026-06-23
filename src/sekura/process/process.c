@@ -10,6 +10,7 @@
 #include <sekura/tools/string.h>
 #include <sekura/boot/info.h>
 #include <sekura/logs/log.h>
+#include <sekura/filesystem/vfs/vfs.h>
 extern void panic(void);
 
 extern uint64_t hhdm;
@@ -27,8 +28,6 @@ static uint64_t next_stack = 0x1000000;
 extern uint64_t kcr3;
 
 static Process* process_alloc(void) {
-    serial_writef("sizeof(Process) = %d\n", sizeof(Process));
-    serial_writef("sizeof(processes) = %d\n", sizeof(processes));
     kdebug_log("PROCESS", "Searching for available process slot.");
 
     for (int i = 0; i < MAX_PROCESSES; i++) {
@@ -43,23 +42,26 @@ static Process* process_alloc(void) {
     return 0;
 }
 
-static struct limine_file* find_module(const char* path) {
+static File* find_module(const char* path) {
     kdebug_log("PROCESS", "Searching for executable module.");
 
     struct limine_module_response* resp = module_request.response;
 
-    if (!resp) {
-        kerror_log("PROCESS", "Module response is unavailable.");
+    VfsNode* node = vfs_resolve(path);
+
+    if (!node) {
+        kerror_log("PROCESS", "Module file is unavailable.");
         return 0;
     }
 
-    for (uint64_t i = 0; i < resp->module_count; i++) {
-        struct limine_file* mod = resp->modules[i];
+    if (!(node->flags & VFS_EXECUTABLE)) {
+        kerror_log("PROCESS", "Node is not executable.");
+        return 0;
+    }
 
-        if (!strcmp(mod->path, path)) {
-            kinfo_log("PROCESS", "Executable module found.");
-            return mod;
-        }
+    if (&node->file) {
+        kinfo_log("PROCESS", "Executable module found.");
+        return &node->file;
     }
 
     kerror_log("PROCESS", "Executable module not found.");
@@ -123,7 +125,7 @@ Process* process_create(const char* path) {
     if (!proc)
         return 0;
 
-    struct limine_file* file = find_module(path);
+    File* file = find_module(path);
 
     if (!file)
         return 0;
@@ -140,7 +142,7 @@ Process* process_create(const char* path) {
 
     kdebug_log("PROCESS", "Loading executable.");
 
-    if (!elf_load(file->address, hhdm, &entry)) {
+    if (!elf_load(file->data, hhdm, &entry)) {
         kerror_log("PROCESS", "ELF loading failed.");
 
         vmm_set_cr3(old_cr3);
@@ -157,6 +159,7 @@ Process* process_create(const char* path) {
 
     proc->heap_start = 0x10000000;
     proc->heap_end = 0x10000000;
+    proc->heap_max = 0x4000000;
 
     kinfo_log("PROCESS", "Process created successfully.");
 
@@ -176,10 +179,6 @@ void process_run(Process* proc) {
     vmm_set_cr3(proc->cr3);
 
     kinfo_log("PROCESS", "Switching to userspace.");
-
-    show_meminfo();
-
-    serial_write("\n");
 
     enter_userspace(proc->rip, proc->rsp);
 }

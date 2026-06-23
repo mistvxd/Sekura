@@ -4,7 +4,7 @@ LD = ld.lld
 
 CFLAGS = -ffreestanding -fno-stack-protector \
           -mno-red-zone -m64 \
-          -Isrc -mcmodel=kernel -msse2
+          -Isrc -mcmodel=kernel -msse2 -g
 
 ASFLAGS = -f elf64
 
@@ -34,16 +34,14 @@ build/%.o: src/%.asm
 	mkdir -p $(dir $@)
 	$(AS) $(ASFLAGS) $< -o $@
 
-version_header:
+iso_root/boot/kernel.elf: $(KERNEL_OBJS)
 	@touch $(BUILD_FILE)
 	@BUILD=$$(cat $(BUILD_FILE)); \
-	BUILD=$$((BUILD + 1)); \
-	echo $$BUILD > $(BUILD_FILE); \
-	mkdir -p src/sekura/generated; \
-	echo "#define SEKURA_BUILD $$BUILD" > src/sekura/generated/version.h; \
-	echo "#define SEKURA_COMMIT \"$(COMMIT)\"" >> src/sekura/generated/version.h
-
-iso_root/boot/kernel.elf: version_header $(KERNEL_OBJS)
+	    BUILD=$$((BUILD + 1)); \
+	    echo $$BUILD > $(BUILD_FILE); \
+	    mkdir -p src/sekura/generated; \
+	    echo "#define SEKURA_BUILD $$BUILD" > src/sekura/generated/version.h; \
+	    echo "#define SEKURA_COMMIT \"$(COMMIT)\"" >> src/sekura/generated/version.h
 	mkdir -p iso_root/boot
 	$(LD) -T linker.ld $(KERNEL_OBJS) -o iso_root/boot/kernel.elf
 

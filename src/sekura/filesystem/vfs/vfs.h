@@ -11,6 +11,8 @@ typedef enum {
     NODE_DIRECTORY
 } NodeType;
 
+#define VFS_EXECUTABLE (1 << 0)
+
 typedef struct {
     uint8_t* data;
     uint64_t size;
@@ -30,6 +32,8 @@ struct VfsNode {
 
     VfsNode* children[MAX_CHILDREN];
     uint64_t child_count;
+
+    uint64_t flags;
 
     File file;
 };

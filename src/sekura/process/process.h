@@ -1,8 +1,9 @@
 #pragma once
 
 #include <stdint.h>
+#include <stddef.h>
 
-#define MAX_PROCESSES 32
+#define MAX_PROCESSES 4
 
 typedef struct {
     uint64_t pid;
@@ -41,6 +42,7 @@ typedef struct {
     
     uint64_t heap_start;
     uint64_t heap_end;
+    size_t heap_max;
 
     __attribute__((aligned(16)))
     uint8_t fpu_state[512];

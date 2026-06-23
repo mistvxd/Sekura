@@ -131,8 +131,10 @@ int64_t sys_open(char *path, int flags) {
 
     VfsNode *node = vfs_resolve(path);
 
-    if (!node && (flags & O_CREAT))
+    if (!node && (flags & O_CREAT)) {
         node = create_file(path, PAGE_SIZE);
+        node->flags |= VFS_EXECUTABLE;    
+    }
 
     if (!node) return -1;
     if (node->type != NODE_FILE) return -1;
@@ -284,8 +286,11 @@ void *sys_sbrk(intptr_t increment) {
     if (increment == 0)
         return (void*)old_break;
 
-    current->heap_end += increment;
     uint64_t heap_total = current->heap_end - current->heap_start;
+    if (heap_total > current->heap_max) {
+        return (void*)-1;
+    }
+    current->heap_end += increment;
     serial_writef("PROCESS PID %d HEAP EXTENDS TO %dMB (%dKB)\n", current->pid, heap_total / 1024 / 1024, heap_total / 1024);
     return (void*)old_break;
 }
@@ -313,6 +318,12 @@ int64_t sys_mkdir(char *path) {
     return mkdir(path) ? 0 : -1;
 }
 
+void sys_exit(int status) {
+    Process* current = scheduler_current();
+    serial_writef("Process PID %d exited with status code %d.\n", current->pid, status);
+    process_kill(current);
+} 
+
 uint64_t syscall_dispatch(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6) {
     uint64_t num; asm volatile("mov %%rax, %0" : "=r"(num));
 
@@ -333,6 +344,7 @@ uint64_t syscall_dispatch(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, ui
         case SYSCALL_SPAWN:     return sys_spawn((void *)a1);
         case SYSCALL_SLEEP:     return sys_sleep((int)a1);
         case SYSCALL_REBOOT:    reboot(); return 0;
+        case SYSCALL_EXIT:      sys_exit((int)a1);
         default:                return (uint64_t)-1;
     }
 }

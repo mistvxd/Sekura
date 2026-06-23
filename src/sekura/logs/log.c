@@ -5,6 +5,7 @@
 #include <sekura/serial/serial.h>
 #include <sekura/tools/string.h>
 #include <sekura/rendering/graphics.h>
+#include <sekura/logs/log.h>
 
 #include <sekura/recovery/recovery.h>
 
@@ -12,6 +13,10 @@
 
 extern uint64_t ticks;
 extern struct limine_framebuffer *glb_fb;
+
+// FLAGS
+int current_flags = WARN_ENABLED | ERROR_ENABLED;
+//
 
 int cursor_x = 0;
 int cursor_y = 0;
@@ -149,24 +154,28 @@ void sleep_busy(uint64_t iterations) {
 }
 
 void kdebug_log(char* module, char* log) {
+    if (!(current_flags & DEBUG_ENABLED)) return;
     uint64_t elapsed_ms = ticks;
     serial_writef("[ SEKURA : %dms : DEBUG ] [%s] : %s\n", elapsed_ms, module, log);
     put_textf(0xffffff, "[ SEKURA : %dms : DEBUG ] [%s] : %s\n", elapsed_ms, module, log);
 }
 
 void kinfo_log(char* module, char* log) {
+    if (!(current_flags & INFO_ENABLED)) return;
     uint64_t elapsed_ms = ticks;
     serial_writef("[ SEKURA : %dms : INFO  ] [%s] : %s\n", elapsed_ms, module, log);
     put_textf(0x80fbff, "[ SEKURA : %dms : INFO  ] [%s] : %s\n", elapsed_ms, module, log);
 }
 
 void kwarn_log(char* module, char* log) {
+    if (!(current_flags & WARN_ENABLED)) return;
     uint64_t elapsed_ms = ticks;
     serial_writef("[ SEKURA : %dms : WARN  ] [%s] : %s\n", elapsed_ms, module, log);
     put_textf(0xfffa5c, "[ SEKURA : %dms : WARN  ] [%s] : %s\n", elapsed_ms, module, log);
 }
 
 void kerror_log(char* module, char* log) {
+    if (!(current_flags & ERROR_ENABLED)) return;
     uint64_t elapsed_ms = ticks;
     serial_writef("[ SEKURA : %dms : ERROR ] [%s] : %s\n", elapsed_ms, module, log);
     put_textf(0xe86f77, "[ SEKURA : %dms : ERROR ] [%s] : %s\n", elapsed_ms, module, log);

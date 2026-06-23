@@ -126,6 +126,7 @@ void vfs_import_boot_modules(struct limine_module_response* modules) {
         VfsNode* file = create_file(mod->path, mod->size);
 
         file->file.data = mod->address;
+        file->flags |= VFS_EXECUTABLE;
     }
 }
 
@@ -138,7 +139,7 @@ void boot_platform_initialize_filesystem(BootContext* context) {
     mkdir("/home");
     mkdir("/sys");
     mkdir("/rootfs");
-    mkdir("/sysinit");
+    mkdir("/rootfs/sysinit");
 }
 
 void boot_platform_initialize_accelerations(BootContext* context) {
@@ -172,6 +173,8 @@ void boot_platform_initialize_architecture(const BootContext* context) {
     //ps2_config();
 
     boot_platform_initialize_filesystem(context);
+
+    vfs_import_boot_modules(module_request.response);
 
     kinfo_log("BOOT", "Architecture initialized.");
 }

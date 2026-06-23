@@ -44,18 +44,18 @@ void show_meminfo(void) {
         serial_write(" B");
     } else if (memory_use < 1024 * 1024) {
         serial_write_int(memory_use / 1024);
-        serial_write(" KB (");
+        serial_write(" KiB (");
         serial_write_int(memory_use);
         serial_write(" B)");
     } else {
         serial_write_int(memory_use / 1024 / 1024);
-        serial_write(" MB (");
+        serial_write(" MiB (");
         serial_write_int(memory_use / 1024);
-        serial_write(" KB)");
+        serial_write(" KiB)");
     }
 
     serial_write(" / ");
 
     serial_write_int(pmm_total_memory() / 1024 / 1024);
-    serial_write(" MB\n");
+    serial_write(" MiB\n");
 }
