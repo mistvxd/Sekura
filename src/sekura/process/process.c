@@ -11,6 +11,9 @@
 #include <sekura/boot/info.h>
 #include <sekura/logs/log.h>
 #include <sekura/filesystem/vfs/vfs.h>
+#include <sekura/utils/units/memory.h>
+#include <sekura/tools/memset.h>
+
 extern void panic(void);
 
 extern uint64_t hhdm;
@@ -69,7 +72,7 @@ static File* find_module(const char* path) {
     return 0;
 }
 
-static uint64_t process_create_stack(void) {
+static uint64_t process_create_stack(Process* proc) {
     kdebug_log("PROCESS", "Creating userspace stack.");
 
     uint64_t base = next_stack;
@@ -83,6 +86,8 @@ static uint64_t process_create_stack(void) {
         }
 
         vmm_map_page(base + i * 0x1000, page, 0x07, hhdm);
+
+        proc->memory_usage += PAGE_SIZE;
     }
 
     next_stack += 0x5000;
@@ -92,7 +97,7 @@ static uint64_t process_create_stack(void) {
     return base + 0x3FF0;
 }
 
-static uint64_t process_create_cr3(void) {
+static uint64_t process_create_cr3(Process* proc) {
     kdebug_log("PROCESS", "Creating process address space.");
 
     uint64_t old_cr3;
@@ -106,7 +111,11 @@ static uint64_t process_create_cr3(void) {
         panic();
     }
 
-    memcpy((void*)(new_cr3 + hhdm), (void*)((old_cr3 & 0x000FFFFFFFFFF000ULL) + hhdm), 4096);
+    proc->memory_usage += PAGE_SIZE;
+
+    memcpy((void*)(new_cr3 + hhdm),
+           (void*)((old_cr3 & 0x000FFFFFFFFFF000ULL) + hhdm),
+           PAGE_SIZE);
 
     uint64_t* pml4 = (uint64_t*)(new_cr3 + hhdm);
 
@@ -130,13 +139,17 @@ Process* process_create(const char* path) {
     if (!file)
         return 0;
 
-    proc->cr3 = process_create_cr3();
+    proc->memory_usage = 0;
+
+    proc->memory_usage += file->size;
+
+    proc->cr3 = process_create_cr3(proc);
 
     uint64_t old_cr3 = vmm_get_cr3();
 
     vmm_set_cr3(proc->cr3);
 
-    proc->rsp = process_create_stack();
+    proc->rsp = process_create_stack(proc);
 
     uint64_t entry;
 
@@ -159,7 +172,9 @@ Process* process_create(const char* path) {
 
     proc->heap_start = 0x10000000;
     proc->heap_end = 0x10000000;
-    proc->heap_max = 0x4000000;
+    proc->heap_max = 64*MIB;
+
+    proc->state = PROCESS_READY;
 
     kinfo_log("PROCESS", "Process created successfully.");
 
@@ -183,6 +198,112 @@ void process_run(Process* proc) {
     enter_userspace(proc->rip, proc->rsp);
 }
 
+void vmm_copy_userspace(uint64_t dst_cr3, uint64_t src_cr3, uint64_t hhdm, Process* proc) {
+    uint64_t* src_pml4 = (uint64_t*)(src_cr3 + hhdm);
+    uint64_t* dst_pml4 = (uint64_t*)(dst_cr3 + hhdm);
+
+    for (int i = 0; i < 256; i++) {
+        if (!(src_pml4[i] & 1)) continue;
+
+        uint64_t* src_pdpt = (uint64_t*)((src_pml4[i] & 0x000FFFFFFFFFF000) + hhdm);
+        uint64_t pdpt_phys = pmm_alloc_page(0, __func__, __LINE__, __FILE__);
+        proc->memory_usage += PAGE_SIZE;
+        uint64_t* dst_pdpt = (uint64_t*)(pdpt_phys + hhdm);
+        memset(dst_pdpt, 0, 4096);
+        dst_pml4[i] = pdpt_phys | (src_pml4[i] & 0xFFF);
+
+        for (int j = 0; j < 512; j++) {
+            if (!(src_pdpt[j] & 1)) continue;
+
+            uint64_t* src_pd = (uint64_t*)((src_pdpt[j] & 0x000FFFFFFFFFF000) + hhdm);
+            uint64_t pd_phys = pmm_alloc_page(0, __func__, __LINE__, __FILE__);
+            proc->memory_usage += PAGE_SIZE;
+            uint64_t* dst_pd = (uint64_t*)(pd_phys + hhdm);
+            memset(dst_pd, 0, 4096);
+            dst_pdpt[j] = pd_phys | (src_pdpt[j] & 0xFFF);
+
+            for (int k = 0; k < 512; k++) {
+                if (!(src_pd[k] & 1)) continue;
+
+                uint64_t* src_pt = (uint64_t*)((src_pd[k] & 0x000FFFFFFFFFF000) + hhdm);
+                uint64_t pt_phys = pmm_alloc_page(0, __func__, __LINE__, __FILE__);
+                proc->memory_usage += PAGE_SIZE;
+                uint64_t* dst_pt = (uint64_t*)(pt_phys + hhdm);
+                memset(dst_pt, 0, 4096);
+                dst_pd[k] = pt_phys | (src_pd[k] & 0xFFF);
+
+                for (int l = 0; l < 512; l++) {
+                    if (!(src_pt[l] & 1)) continue;
+
+                    uint64_t src_page_phys = src_pt[l] & 0x000FFFFFFFFFF000;
+                    uint64_t dst_page_phys = pmm_alloc_page(0, __func__, __LINE__, __FILE__);
+                    proc->memory_usage += PAGE_SIZE;
+
+                    memcpy((void*)(dst_page_phys + hhdm),
+                           (void*)(src_page_phys + hhdm),
+                           4096);
+
+                    dst_pt[l] = dst_page_phys | (src_pt[l] & 0xFFF);
+                }
+            }
+        }
+    }
+}
+
+int process_fork(Process* parent) {
+    Process* child = process_alloc();
+    if (!child)
+        return -1;
+
+    memcpy(child, parent, sizeof(Process));
+
+    child->cr3 = process_create_cr3(child);
+
+    vmm_copy_userspace(child->cr3, parent->cr3 & 0x000FFFFFFFFFF000, hhdm, child);
+
+    child->pid   = next_pid++;
+    child->state = PROCESS_READY;
+    child->alive = 1;
+    child->rax   = 0;
+
+    return child->pid;
+}
+
+static void vmm_free_userspace(uint64_t cr3, uint64_t hhdm) {
+    uint64_t* pml4 = (uint64_t*)(cr3 + hhdm);
+
+    for (int i = 0; i < 256; i++) {
+        if (!(pml4[i] & 1)) continue;
+
+        uint64_t* pdpt = (uint64_t*)((pml4[i] & 0x000FFFFFFFFFF000) + hhdm);
+
+        for (int j = 0; j < 512; j++) {
+            if (!(pdpt[j] & 1)) continue;
+
+            uint64_t* pd = (uint64_t*)((pdpt[j] & 0x000FFFFFFFFFF000) + hhdm);
+
+            for (int k = 0; k < 512; k++) {
+                if (!(pd[k] & 1)) continue;
+
+                uint64_t* pt = (uint64_t*)((pd[k] & 0x000FFFFFFFFFF000) + hhdm);
+
+                for (int l = 0; l < 512; l++) {
+                    if (!(pt[l] & 1)) continue;
+                    pmm_free_page(pt[l] & 0x000FFFFFFFFFF000);
+                }
+
+                pmm_free_page(pd[k] & 0x000FFFFFFFFFF000); // PT
+            }
+
+            pmm_free_page(pdpt[j] & 0x000FFFFFFFFFF000); // PD
+        }
+
+        pmm_free_page(pml4[i] & 0x000FFFFFFFFFF000); // PDPT
+    }
+
+    pmm_free_page(cr3); // PML4
+}
+
 void process_kill(Process* proc) {
     kdebug_log("PROCESS", "Terminating process.");
 
@@ -191,7 +312,34 @@ void process_kill(Process* proc) {
         return;
     }
 
+    vmm_free_userspace(proc->cr3 & 0x000FFFFFFFFFF000, hhdm);
+
     proc->alive = 0;
+    proc->state = PROCESS_DEAD;
+
+    for (int i = 0; i < MAX_PROCESSES; i++) {
+        Process* waiter = &processes[i];
+        if (waiter->state != PROCESS_WAITING) continue;
+        if (waiter->waiting_pid != proc->pid) continue;
+        waiter->rax = proc->exit_status;
+        waiter->waiting_pid = -1;
+        waiter->state = PROCESS_READY;
+    }
 
     kinfo_log("PROCESS", "Process terminated.");
+}
+
+Process* process_get_pid(int pid) {
+    for (int i = 0; i < MAX_PROCESSES; i++) {
+
+        Process* proc = &processes[i];
+
+        if (!proc->alive)
+            continue;
+
+        if (proc->pid == pid)
+            return proc;
+    }
+
+    return NULL;
 }

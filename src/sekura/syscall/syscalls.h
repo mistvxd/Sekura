@@ -38,7 +38,11 @@ enum {
     SYSCALL_SPAWN     = 13,
     SYSCALL_EXIT      = 14,
     SYSCALL_SLEEP     = 15,
+    SYSCALL_KILL      = 16,
+    SYSCALL_WAIT      = 17,
+    SYSCALL_FORK      = 18,
+    SYSCALL_GETPID    = 19,
 
     // system
-    SYSCALL_REBOOT    = 16
+    SYSCALL_REBOOT    = 20
 };

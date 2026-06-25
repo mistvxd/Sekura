@@ -3,7 +3,6 @@
 #include <sekura/process/process.h>
 #include <sekura/memory/vmm/vmm.h>
 #include <sekura/serial/serial.h>
-#include <sekura/recovery/recovery.h>
 #include <sekura/arch/x86_64/fpu/fpu.h>
 
 #include <sekura/logs/log.h>
@@ -19,6 +18,8 @@ extern volatile int recovery_requested;
 
 extern Process processes[MAX_PROCESSES];
 
+extern uint64_t *current_syscall_frame;
+
 Process* current_process;
 
 int scheduler_started;
@@ -28,12 +29,14 @@ int scheduler_paused;
 void scheduler_start(void) {
     kdebug_log("SCHED", "Starting scheduler.");
 
-    if (!processes[0].alive) {
+    if (processes[0].state != PROCESS_READY) {
         kerror_log("SCHED", "Init process unavailable.");
         panic();
     }
 
     current_process = &processes[0];
+
+    current_process->state = PROCESS_RUNNING;
 
     scheduler_started = 1;
 
@@ -46,10 +49,21 @@ Process* scheduler_next(void) {
     int current = current_process - processes;
 
     for (int i = 1; i <= MAX_PROCESSES; i++) {
+
         int idx = (current + i) % MAX_PROCESSES;
 
-        if (processes[idx].alive)
-            return &processes[idx];
+        Process* proc = &processes[idx];
+
+        if (!proc->alive)
+            continue;
+
+        if (proc->state == PROCESS_WAITING)
+            continue;
+
+        if (proc->state == PROCESS_DEAD)
+            continue;
+
+        return proc;
     }
 
     return current_process;
@@ -123,12 +137,15 @@ void scheduler_tick(InterruptFrame* frame) {
         return;
 
     Process* next = scheduler_next();
-
     if (next == current_process)
         return;
 
-    if (!next->started) {
+    if (next->state == PROCESS_DEAD)
+        return;
+
+    if (next->state == PROCESS_READY) {
         next->started = 1;
+        next->state = PROCESS_RUNNING;
     }
 
     context_switch(frame, current_process, next);
@@ -136,4 +153,40 @@ void scheduler_tick(InterruptFrame* frame) {
 
 Process* scheduler_current(void) {
     return current_process;
-}uint64_t current_kernel_stack = 0;
+}
+
+void scheduler_yield(void) {
+    Process* current = scheduler_current();
+    Process* next = scheduler_next();
+
+    InterruptFrame* frame = (InterruptFrame*) current_syscall_frame;
+
+    if (!next)
+        return;
+
+    if (next == current)
+        return;
+
+    context_switch(frame, current, next);
+}
+
+void scheduler_kill_current(InterruptFrame* frame) {
+    Process* current = current_process;
+    process_kill(current);
+
+    Process* next = scheduler_next();
+
+    if (!next || next == current) {
+        kerror_log("SCHED", "No process to switch to after kill.");
+        for (;;) __asm__ volatile("cli; hlt");
+    }
+
+    if (next->state == PROCESS_READY) {
+        next->started = 1;
+        next->state = PROCESS_RUNNING;
+    }
+
+    load_context(frame, next);
+    fxrstor(next->fpu_state);
+    current_process = next;
+}

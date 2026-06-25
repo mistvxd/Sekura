@@ -67,12 +67,12 @@ sekura.iso: iso_root/boot/kernel.elf iso_root/rootfs
 	limine/limine bios-install sekura.iso
 
 run: all
-	qemu-system-x86_64 \
+	@qemu-system-x86_64 \
 		-cdrom sekura.iso \
 		-serial stdio
 
 kvm: all
-	qemu-system-x86_64 \
+	@qemu-system-x86_64 \
 		-cdrom sekura.iso \
 		-serial stdio \
 		-accel kvm \
@@ -81,7 +81,7 @@ kvm: all
   		-device usb-tablet
 
 debug: all
-	qemu-system-x86_64 \
+	@qemu-system-x86_64 \
 		-cdrom sekura.iso \
 		-serial stdio \
 		-d int,cpu_reset \
@@ -91,7 +91,7 @@ debug: all
   		-device usb-tablet
 
 dekvm: all
-	qemu-system-x86_64 \
+	@qemu-system-x86_64 \
 		-cdrom sekura.iso \
 		-serial stdio \
 		-d int,cpu_reset \
@@ -101,7 +101,7 @@ dekvm: all
 		-cpu host
 
 clean:
-	rm -rf build
-	rm -rf iso_root/rootfs
-	rm -f sekura.iso
-	rm -f iso_root/boot/kernel.elf
+	@rm -rf build
+	@rm -rf iso_root/rootfs
+	@rm -f sekura.iso
+	@rm -f iso_root/boot/kernel.elf

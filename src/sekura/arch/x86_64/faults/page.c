@@ -6,7 +6,11 @@
 #include <sekura/memory/vmm/vmm.h>
 #include <sekura/process/process.h>
 #include <sekura/scheduler/scheduler.h>
+#include <sekura/process/process.h>
 #include <sekura/serial/serial.h>
+
+#define ANSI_FAULT "\x1b[95m"
+#define ANSI_RESET   "\x1b[0m"
 
 extern uint64_t hhdm;
 
@@ -77,7 +81,7 @@ void pf_handler(uint64_t* stack) {
     if (page_fault_handle_user_heap(cr2, cpl))
         return;
 
-    serial_write("\n[ SEKURA : #PF]");
+    serial_write(ANSI_FAULT "\n[ SEKURA : #PF ]");
     serial_write(" RIP=");
     serial_write_hex(rip);
     serial_write(" CR2=");
@@ -86,7 +90,7 @@ void pf_handler(uint64_t* stack) {
     serial_write_hex(error);
     serial_write(" CPL=");
     serial_write_hex(cpl);
-    serial_write("\n");
+    serial_write("\n" ANSI_RESET);
 
     for (;;) {
         __asm__ volatile("cli; hlt");

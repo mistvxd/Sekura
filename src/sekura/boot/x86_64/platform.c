@@ -7,7 +7,7 @@
 #include <sekura/arch/x86_64/idt/idt.h>
 #include <sekura/arch/x86_64/tss/tss.h>
 #include <sekura/boot/x86_64/platform.h>
-#include <sekura/kdrivers/disk.h>
+#include <sekura/drivers/disk.h>
 #include <sekura/logs/log.h>
 #include <sekura/memory/pmm/pmm.h>
 #include <sekura/memory/vmm/vmm.h>
@@ -118,13 +118,29 @@ void boot_platform_load_context(BootContext* context) {
     }
 }
 
+const char* basename(const char* path) {
+    const char* name = path;
+
+    while (*path) {
+        if (*path == '/')
+            name = path + 1;
+
+        path++;
+    }
+
+    return name;
+}
+
 void vfs_import_boot_modules(struct limine_module_response* modules) {
     for (uint64_t i = 0; i < modules->module_count; i++) {
 
         struct limine_file* mod = modules->modules[i];
 
         VfsNode* file = create_file(mod->path, mod->size);
+        
+        char* name = basename(mod->path);
 
+        memcpy(file->name, name, strlen(name));
         file->file.data = mod->address;
         file->flags |= VFS_EXECUTABLE;
     }
