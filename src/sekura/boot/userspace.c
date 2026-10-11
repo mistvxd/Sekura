@@ -9,12 +9,14 @@
 #include <sekura/boot/services.h>
 #include <sekura/modules/modules.h>
 #include <sekura/arch/x86_64/cpu/pat.h>
+#include <sekura/serial/serial.h>
 
 #define USER_FB 0x7000000000
 #define USER_FB_INFO 0x7100000000
 
 extern uint64_t hhdm;
 extern uint64_t kcr3;
+extern uint64_t ticks;
 extern void panic(void);
 
 typedef struct {
@@ -31,7 +33,7 @@ typedef struct {
 } FramebufferFile;
 
 Process* boot_create_init_process(void) {
-    Process* init = process_create("/rootfs/sysinit/init.elf");
+    Process* init = process_create("/bin/init.elf");
 
     if (!init) {
         kerror_log("INIT", "Failed to create init process.");
@@ -96,4 +98,5 @@ void boot_userspace_initialize(Process* init, const BootContext* context) {
     vmm_set_cr3(kcr3);
 
     kinfo_log("USERSPACE", "Userspace environment initialized.");
+    serial_writef("\x1b[1;38;5;73m[BOOT]\x1b[0;36m Sekura initialization took \x1b[1;38;5;73m%d\x1b[0;36m milliseconds.\n" "\x1b[0m", ticks);
 }

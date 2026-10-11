@@ -11,27 +11,6 @@ uint64_t *current_syscall_frame;
 int inside_syscall = 0;
 uint64_t userspace_rsp;
 
-static int fd_alloc(void) {
-    for (int i = 0; i < FD_TABLE_SIZE; i++) {
-        if (fd_table[i].type == FD_TYPE_NONE)
-            return i;
-    }
-
-    return -1;
-}
-
-FileDescriptor *fd_get(int fd) {
-    int i = fd - RESERVED_FD_COUNT;
-
-    if (i < 0 || i >= FD_TABLE_SIZE)
-        return NULL;
-
-    if (fd_table[i].type == FD_TYPE_NONE)
-        return NULL;
-
-    return &fd_table[i];
-}
-
 uint64_t syscall_dispatch(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6) {
     uint64_t num;
 
@@ -76,6 +55,10 @@ uint64_t syscall_dispatch(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, ui
         case SYSCALL_FORK: return sys_fork();
 
         case SYSCALL_GETPID: return sys_getpid();
+
+        case SYSCALL_PIPE: return sys_pipe((int*)a1);
+
+        case SYSCALL_DUP2: return sys_dup2((int)a1, (int)a2);
 
         case SYSCALL_REBOOT: reboot(); return 0;
 

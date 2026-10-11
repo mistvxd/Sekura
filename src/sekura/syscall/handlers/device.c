@@ -9,6 +9,7 @@
 #include <sekura/scheduler/scheduler.h>
 #include <sekura/modules/modules.h>
 #include <sekura/tools/string.h>
+#include <sekura/tools/memset.h>
 
 extern uint64_t hhdm;
 
@@ -21,44 +22,21 @@ typedef struct {
 
 FramebufferInfo glb_fb_info;
 
-#define ANSI_TRACE "\x1b[90m"
-#define ANSI_RESET "\x1b[0m"
-
-static FileDescriptor* get_fd_table(void) {
-    return scheduler_current()->fd_table;
-}
-
-static int fd_alloc(void) {
-    FileDescriptor* fd_table = get_fd_table();
-
-    for (int i = 0; i < FD_TABLE_SIZE; i++) {
-        if (fd_table[i].type == FD_TYPE_NONE)
-            return i;
-    }
-
-    return -1;
-}
-
-static FileDescriptor* fd_get(int fd) {
-    FileDescriptor* fd_table = get_fd_table();
-
-    int i = fd - RESERVED_FD_COUNT;
-
-    if (i < 0 || i >= FD_TABLE_SIZE)
-        return NULL;
-
-    if (fd_table[i].type == FD_TYPE_NONE)
-        return NULL;
-
-    return &fd_table[i];
-}
-
-int64_t sys_ioctl(int fd, int action, void *arg) {
-    FileDescriptor *f = fd_get(fd);
-    if (!f) return -1;
+static int64_t fb_ioctl(void *ctx, int action, void *arg) {
     if (action == 0) {
-        memcpy(arg, f->object, sizeof(FramebufferInfo));
+        memcpy(arg, ctx, sizeof(FramebufferInfo));
         return 0;
     }
     return -1;
 }
+
+static int64_t fb_read (void *ctx, void *buf,       uint64_t count, uint64_t *off) { (void)ctx;(void)buf;(void)count;(void)off; return -1; }
+static int64_t fb_write(void *ctx, const void *buf, uint64_t count, uint64_t *off) { (void)ctx;(void)buf;(void)count;(void)off; return -1; }
+
+static const FdOps fb_ops = {
+    .read  = fb_read,
+    .write = fb_write,
+    .seek  = NULL,
+    .ioctl = fb_ioctl,
+    .close = NULL,
+};

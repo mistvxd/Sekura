@@ -27,6 +27,7 @@ void sys_exit(int status) {
     current->exit_status = status;
     serial_writef(ANSI_TRACE "[TRACE] : Process PID %d exited with status code %d.\n" ANSI_RESET, current->pid, status);
     process_kill(current);
+    scheduler_yield();
 } 
 
 int64_t sys_kill(int pid) {

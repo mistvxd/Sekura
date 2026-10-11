@@ -46,10 +46,10 @@ iso_root/boot/kernel.elf: $(KERNEL_OBJS)
 	$(LD) -T linker.ld $(KERNEL_OBJS) -o iso_root/boot/kernel.elf
 
 iso_root/rootfs: $(ROOTFS_FILES)
-	rm -rf iso_root/rootfs
-	mkdir -p iso_root/rootfs
-	cp -r $(ROOTFS_DIR)/* iso_root/rootfs/
-	touch iso_root/rootfs
+	rm -rf iso_root/bin
+	mkdir -p iso_root/bin
+	cp -r $(ROOTFS_DIR)/* iso_root/bin/
+	touch iso_root/bin
 
 sekura.iso: iso_root/boot/kernel.elf iso_root/rootfs
 	xorriso -as mkisofs \

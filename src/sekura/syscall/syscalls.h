@@ -1,10 +1,10 @@
+#pragma once
 #include <stdint.h>
 
 enum {
     FD_STDIN        = 0,
     FD_STDOUT       = 1,
-    FD_STDERR       = 2,
-    FD_SERIAL       = 3
+    FD_STDERR       = 2
 };
 
 enum {
@@ -43,6 +43,10 @@ enum {
     SYSCALL_FORK      = 18,
     SYSCALL_GETPID    = 19,
 
+    // fd management
+    SYSCALL_PIPE      = 20,
+    SYSCALL_DUP2      = 21,
+
     // system
-    SYSCALL_REBOOT    = 20
+    SYSCALL_REBOOT    = 22
 };

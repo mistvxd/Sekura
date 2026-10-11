@@ -3,57 +3,65 @@
 #include <sekura/syscall/handlers/handler.h>
 #include <sekura/filesystem/vfs/vfs.h>
 #include <sekura/syscall/syscalls.h>
-#include <sekura/memory/pmm/pmm.h>
-#include <sekura/arch/x86_64/io/io.h>
-#include <sekura/arch/x86_64/interrupts/mouse.h>
 #include <sekura/scheduler/scheduler.h>
-#include <sekura/modules/modules.h>
 #include <sekura/tools/string.h>
-#include <sekura/tools/memset.h>
 
-extern uint64_t hhdm;
-
-#define ANSI_TRACE "\x1b[90m"
-#define ANSI_RESET "\x1b[0m"
-
-static FileDescriptor* get_fd_table(void) {
+static FileDescriptor *get_fd_table(void) {
     return scheduler_current()->fd_table;
 }
 
 static int fd_alloc(void) {
-    FileDescriptor* fd_table = get_fd_table();
+    FileDescriptor *fd_table = get_fd_table();
+    fd_table_init_reserved(fd_table);
 
     for (int i = 0; i < FD_TABLE_SIZE; i++) {
-        if (fd_table[i].type == FD_TYPE_NONE)
+        if (fd_is_reserved(i))
+            continue;
+        if (!fd_table[i].ops)
             return i;
     }
 
     return -1;
 }
 
-static FileDescriptor* fd_get(int fd) {
-    FileDescriptor* fd_table = get_fd_table();
-
-    int i = fd - RESERVED_FD_COUNT;
-
-    if (i < 0 || i >= FD_TABLE_SIZE)
+static FileDescriptor *fd_get(int fd) {
+    if (fd < 0 || fd >= FD_TABLE_SIZE)
         return NULL;
 
-    if (fd_table[i].type == FD_TYPE_NONE)
+    FileDescriptor *fd_table = get_fd_table();
+    fd_table_init_reserved(fd_table);
+
+    if (!fd_table[fd].ops)
         return NULL;
 
-    return &fd_table[i];
+    return &fd_table[fd];
 }
 
-int64_t sys_opendir(char *path) {
-    FileDescriptor* fd_table = scheduler_current()->fd_table;
+static int64_t dir_read(void *ctx, void *buf, uint64_t count, uint64_t *offset) {
+    (void)count;
 
-    VfsNode *node = vfs_resolve(path);
+    VfsNode *dir = ctx;
 
-    if (!node)
+    if (*offset >= dir->child_count)
         return -1;
 
-    if (node->type != NODE_DIRECTORY)
+    VfsNode *child = dir->children[*offset];
+
+    memcpy(buf, child->name, strlen(child->name) + 1);
+
+    (*offset)++;
+
+    return 0;
+}
+
+static const FdOps dir_ops = {
+    .read = dir_read,
+};
+
+int64_t sys_opendir(char *path) {
+    VfsNode *node = vfs_resolve(path);
+
+    if (!node || node->type != NODE_DIRECTORY)
         return -1;
 
     int i = fd_alloc();
@@ -61,28 +69,23 @@ int64_t sys_opendir(char *path) {
     if (i < 0)
         return -1;
 
-    fd_table[i].object = node;
-    fd_table[i].type = FD_TYPE_DIR;
-    fd_table[i].flags = 0;
-    fd_table[i].offset = 0;
+    FileDescriptor *fd = &get_fd_table()[i];
 
-    return i + RESERVED_FD_COUNT;
+    fd->ctx = node;
+    fd->ops = &dir_ops;
+    fd->flags = 0;
+    fd->offset = 0;
+
+    return i;
 }
 
 int64_t sys_readdir(int fd, char *buffer) {
     FileDescriptor *f = fd_get(fd);
-    if (!f || f->type != FD_TYPE_DIR) return -1;
 
-    VfsNode *dir = (VfsNode *)f->object;
-    uint64_t index = f->offset;
+    if (!f || !f->ops->read)
+        return -1;
 
-    if (index >= (uint64_t)dir->child_count) return -1;
-
-    VfsNode *child = dir->children[index];
-    memcpy(buffer, child->name, strlen(child->name) + 1);
-    f->offset++;
-
-    return 0;
+    return f->ops->read(f->ctx, buffer, 0, &f->offset);
 }
 
 int64_t sys_closedir(int fd) {
@@ -90,6 +93,8 @@ int64_t sys_closedir(int fd) {
 }
 
 int64_t sys_mkdir(char *path) {
-    if (vfs_resolve(path)) return -1;
+    if (vfs_resolve(path))
+        return -1;
+
     return mkdir(path) ? 0 : -1;
 }

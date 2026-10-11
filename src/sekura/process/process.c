@@ -40,7 +40,7 @@ static Process* process_alloc(void) {
         }
     }
 
-    kerror_log("PROCESS", "No available process slots.");
+    //kerror_log("PROCESS", "No available process slots.");
 
     return 0;
 }
@@ -169,6 +169,7 @@ Process* process_create(const char* path) {
     proc->rip = entry;
     proc->alive = 1;
     proc->rflags = 0x202;
+    memcpy(proc->name, path, 64);
 
     proc->heap_start = 0x10000000;
     proc->heap_end = 0x10000000;
@@ -304,6 +305,13 @@ static void vmm_free_userspace(uint64_t cr3, uint64_t hhdm) {
     pmm_free_page(cr3); // PML4
 }
 
+void process_free(Process* proc) {
+    if (!proc) return;
+    vmm_free_userspace(proc->cr3 & 0x000FFFFFFFFFF000, hhdm);
+    proc->state = PROCESS_DEAD;
+    proc->pid = 0;
+}
+
 void process_kill(Process* proc) {
     kdebug_log("PROCESS", "Terminating process.");
 
@@ -329,6 +337,23 @@ void process_kill(Process* proc) {
     kinfo_log("PROCESS", "Process terminated.");
 }
 
+void process_killall() {
+    for (int i = 0; i < MAX_PROCESSES; i++) {
+        Process* proc = &processes[i];
+        if (!proc->alive) continue;
+        process_kill(proc);
+    }
+}
+
+void process_killall_except(int pid) {
+    for (int i = 0; i < MAX_PROCESSES; i++) {
+        Process* proc = &processes[i];
+        if (!proc->alive) continue;
+        if (proc->pid == pid) continue;
+        process_kill(proc);
+    }
+}
+
 Process* process_get_pid(int pid) {
     for (int i = 0; i < MAX_PROCESSES; i++) {
 
@@ -341,5 +366,13 @@ Process* process_get_pid(int pid) {
             return proc;
     }
 
+    return NULL;
+}
+
+Process* process_get_pid_any(int pid) {
+    for (int i = 0; i < MAX_PROCESSES; i++) {
+        if (processes[i].pid == pid)
+            return &processes[i];
+    }
     return NULL;
 }

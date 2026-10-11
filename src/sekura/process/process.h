@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <sekura/syscall/handlers/handler.h>
 
-#define MAX_PROCESSES 4
+#define MAX_PROCESSES 64
 
 typedef enum {
     PROCESS_READY,
@@ -43,6 +43,8 @@ typedef struct {
     uint64_t rflags;
 
     uint64_t cr3;
+
+    char name[64];
 
     int alive;
     int started;
@@ -100,3 +102,7 @@ void process_run(Process* proc);
 void process_kill(Process* proc);
 Process* process_get_pid(int pid);
 int process_fork(Process* parent);
+void process_killall();
+void process_killall_except(int pid);
+Process* process_get_pid_any(int pid);
+void process_free(Process* proc);

@@ -3,6 +3,7 @@
 #include <sekura/memory/pmm/pmm.h>
 #include <sekura/serial/serial.h>
 #include <limine/limine.h>
+#include <sekura/process/process.h>
 
 #include <sekura/logs/log.h>
 
@@ -23,6 +24,8 @@ uint64_t bitmap_size;
 uint64_t initial_bitmap_size;
 
 uint64_t highest_addr = 0;
+
+static uint64_t last_byte = 0;
 
 void pmm_push_memmap(struct limine_memmap_response* mmap_rp) {
     memmap = mmap_rp;
@@ -147,7 +150,7 @@ uint64_t pmm_alloc_page(uint64_t offset, const char* tag, int line, const char* 
     int f_bit;
     int found = 0;
 
-    for (size_t byte = 0; byte < bitmap_size; byte++) {
+    for (size_t byte = last_byte; byte < bitmap_size; byte++) {
         for (size_t bit = 0; bit < 8; bit++) {
             if (!(bitmap[byte] & (1 << bit))) {
                 f_byte = byte;
@@ -160,8 +163,14 @@ uint64_t pmm_alloc_page(uint64_t offset, const char* tag, int line, const char* 
     }
 
     if (!found) { 
+        kerror_log("PMM", "Out of memory. Terminating all processes.");
+        process_killall_except(1);
+        uint64_t page = pmm_alloc_page(offset, tag, line, file);
+        if (!page) panic();
         return 0;
     }
+
+    last_byte = 0;
 
     bitmap[f_byte] |= (1 << f_bit);
 

@@ -154,8 +154,6 @@ void boot_platform_initialize_filesystem(BootContext* context) {
     mkdir("/etc");
     mkdir("/home");
     mkdir("/sys");
-    mkdir("/rootfs");
-    mkdir("/rootfs/sysinit");
 }
 
 void boot_platform_initialize_accelerations(BootContext* context) {
